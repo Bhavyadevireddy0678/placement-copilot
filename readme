@@ -1,0 +1,35 @@
+# AI Placement Copilot
+
+A hybrid AI system that answers placement-related questions in natural language by routing between structured database analytics and document retrieval.
+
+## Architecture
+
+```mermaid
+graph TD
+    A[User Question] --> B[FastAPI /ask endpoint]
+    B --> C{Intent Router}
+    C -->|Analytics question| D[Text-to-SQL via Groq]
+    D --> E[PostgreSQL]
+    E --> H[Final Answer]
+    C -->|Policy/document question| F[Sentence-Transformers Embedding]
+    F --> G[pgvector Similarity Search]
+    G --> I[Groq LLM Generation]
+    I --> H
+```
+
+## How it works
+- **Analytics questions** (e.g. "How many students got placed at Microsoft?") → Groq converts natural language to SQL → executed against PostgreSQL → returns structured answer.
+- **Policy/document questions** → question is embedded via Sentence-Transformers (`all-MiniLM-L6-v2`) → cosine similarity search against PostgreSQL using `pgvector` (`<=>` operator) → retrieved context passed to Groq for final answer generation.
+- **Intent Router** (rule-based) classifies each incoming question and dispatches it to the correct branch.
+
+## Stack
+FastAPI · PostgreSQL + pgvector · SQLAlchemy · Sentence-Transformers · Groq LLM · Docker
+
+## Data
+Synthetic placement dataset generated via Faker — no real student data used.
+
+## Status
+- ✅ SQL analytics branch (Text-to-SQL via Groq, `/ask` endpoint)
+- ✅ RAG branch (embeddings + pgvector retrieval)
+- ✅ Intent router combining both branches
+- 🔧 Frontend — in progress
