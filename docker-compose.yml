@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  db:
+    image: ankane/pgvector
+    environment:
+      POSTGRES_USER: raguser
+      POSTGRES_PASSWORD: ragpass
+      POSTGRES_DB: placement_rag
+    ports:
+      - "5432:5432"
