@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, text
+from db_config import get_database_url
 
-DATABASE_URL = "postgresql://raguser:ragpass@localhost:5432/placement_rag"
+DATABASE_URL = get_database_url()
 
 engine = create_engine(DATABASE_URL)
 

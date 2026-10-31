@@ -1,7 +1,8 @@
 from sqlalchemy import create_engine, text
 from sentence_transformers import SentenceTransformer
+from db_config import get_database_url
 
-DATABASE_URL = "postgresql://raguser:ragpass@localhost:5432/placement_rag"
+DATABASE_URL = get_database_url()
 
 engine = create_engine(DATABASE_URL)
 
@@ -14,12 +15,13 @@ embedding = model.encode(chunk).tolist()
 with engine.connect() as conn:
     conn.execute(
         text("""
-        INSERT INTO chunks (content, embedding)
-        VALUES (:content, :embedding)
+        INSERT INTO chunks (content, embedding, source)
+        VALUES (:content, :embedding, :source)
         """),
         {
             "content": chunk,
-            "embedding": embedding
+            "embedding": embedding,
+            "source": "manual"
         }
     )
     

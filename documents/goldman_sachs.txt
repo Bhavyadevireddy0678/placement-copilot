@@ -1,0 +1,14 @@
+Goldman Sachs Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 7.5 to apply for Goldman Sachs.
+
+Students must not have any active backlogs at the time of the recruitment process.
+
+Recruitment process consists of an online technical assessment (coding + quantitative aptitude), followed by two to three technical interview rounds and a final HR round.
+
+Goldman Sachs recruits for Technology Analyst roles primarily from CSE, CSE-AI, and IT branches.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria may vary depending on the specific division (Engineering vs Risk/Quant) within Goldman Sachs.

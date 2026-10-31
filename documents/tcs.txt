@@ -1,0 +1,16 @@
+TCS Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 6.0 to apply for TCS (TCS NQT pathway).
+
+Students are allowed a maximum of one active backlog at the time of the TCS NQT exam, but all backlogs must be cleared before joining.
+
+Recruitment process consists of the TCS National Qualifier Test (NQT) followed by a technical and HR interview round.
+
+TCS recruits under multiple bands - TCS Ninja, TCS Digital, and TCS Prime - each with different CGPA and package thresholds.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria vary significantly by band (Ninja vs Digital vs Prime); Digital and Prime generally require CGPA of 7.0 and above.
+
+

@@ -1,6 +1,7 @@
 from sentence_transformers import SentenceTransformer
 import psycopg2
 from pgvector.psycopg2 import register_vector
+from db_config import get_database_url
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -8,13 +9,7 @@ query = input("Ask: ")
 
 query_embedding = model.encode(query)
 
-conn = psycopg2.connect(
-    dbname="placement_rag",
-    user="raguser",
-    password="ragpass",
-    host="localhost",
-    port="5432"
-)
+conn = psycopg2.connect(get_database_url(), connect_timeout=5)
 
 register_vector(conn)
 

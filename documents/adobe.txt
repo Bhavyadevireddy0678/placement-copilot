@@ -1,0 +1,14 @@
+Adobe Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 7.5 to apply for Adobe.
+
+Students must not have any active or historical backlogs at the time of application.
+
+Recruitment process consists of an online coding assessment followed by two technical interview rounds and one HR round, with strong emphasis on DSA and CS fundamentals.
+
+Adobe primarily hires for Member of Technical Staff (MTS) roles, restricted to CSE, CSE-AI, and IT branches.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria are among the stricter cutoffs on campus given the limited headcount.

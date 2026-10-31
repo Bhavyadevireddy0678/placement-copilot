@@ -3,14 +3,22 @@ from pgvector.psycopg2 import register_vector
 from groq import Groq
 import psycopg2
 import os
+from dotenv import load_dotenv
+from db_config import get_database_url
+
+load_dotenv()
 
 # Embedding model
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Groq client
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY")
-)
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    raise RuntimeError("GROQ_API_KEY is not set")
+
+MODEL_NAME = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+client = Groq(api_key=api_key)
+
 # User question
 query = input("Ask: ")
 
@@ -18,13 +26,7 @@ query = input("Ask: ")
 query_embedding = model.encode(query)
 
 # Connect to PostgreSQL
-conn = psycopg2.connect(
-    dbname="placement_rag",
-    user="raguser",
-    password="ragpass",
-    host="localhost",
-    port="5432"
-)
+conn = psycopg2.connect(get_database_url(), connect_timeout=5)
 
 register_vector(conn)
 
@@ -61,7 +63,7 @@ Question:
 """
 
 response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
+    model=MODEL_NAME,
     messages=[
         {
             "role": "user",

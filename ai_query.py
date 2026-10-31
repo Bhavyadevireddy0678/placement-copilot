@@ -1,14 +1,14 @@
 from sqlalchemy import create_engine, text
 from groq import Groq
-from sqlalchemy import create_engine, text
 import os
+from db_config import get_database_url
 
 client = Groq(
     api_key=os.environ.get("GROQ_API_KEY")
 )
 
 engine = create_engine(
-    "postgresql://raguser:ragpass@localhost:5432/placement_rag"
+    get_database_url()
 )
 
 question = input("Ask: ")

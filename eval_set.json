@@ -1,0 +1,272 @@
+[
+  {
+    "id": "sql_01",
+    "group": "sql",
+    "question": "How many placement rows are in the dataset?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(*) FROM placements",
+    "expected_answer": {"kind": "sql_result", "value": 600}
+  },
+  {
+    "id": "sql_02",
+    "group": "sql",
+    "question": "What is the average FTE package?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements",
+    "expected_answer": {"kind": "sql_result", "value": 14.045}
+  },
+  {
+    "id": "sql_03",
+    "group": "sql",
+    "question": "What is the highest package in the placement data?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT MAX(fte_package) FROM placements",
+    "expected_answer": {"kind": "sql_result", "value": 39.46}
+  },
+  {
+    "id": "sql_04",
+    "group": "sql",
+    "question": "How many students were placed at Google?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+    "expected_answer": {"kind": "sql_result", "value": 51}
+  },
+  {
+    "id": "sql_05",
+    "group": "sql",
+    "question": "What was Amazon's average package?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements WHERE company = 'Amazon'",
+    "expected_answer": {"kind": "sql_result", "value": 16.9729}
+  },
+  {
+    "id": "sql_06",
+    "group": "sql",
+    "question": "How many placements came from each branch?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT branch, COUNT(*) AS total FROM placements GROUP BY branch ORDER BY branch",
+    "expected_answer": {
+      "kind": "sql_result",
+      "value": [
+        {"branch": "CSE", "total": 159},
+        {"branch": "CSE-AI", "total": 144},
+        {"branch": "ECE", "total": 149},
+        {"branch": "IT", "total": 148}
+      ]
+    }
+  },
+  {
+    "id": "sql_07",
+    "group": "sql",
+    "question": "What is Deloitte's maximum FTE package?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT MAX(fte_package) FROM placements WHERE company = 'Deloitte'",
+    "expected_answer": {"kind": "sql_result", "value": 7.99}
+  },
+  {
+    "id": "sql_08",
+    "group": "sql",
+    "question": "How many students were placed in November?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(*) FROM placements WHERE month_placed = 'Nov'",
+    "expected_answer": {"kind": "sql_result", "value": 146}
+  },
+  {
+    "id": "sql_09",
+    "group": "sql",
+    "question": "How many different companies appear in the data?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(DISTINCT company) FROM placements",
+    "expected_answer": {"kind": "sql_result", "value": 12}
+  },
+  {
+    "id": "sql_10",
+    "group": "sql",
+    "question": "Which company has the highest average FTE package?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT company FROM placements GROUP BY company ORDER BY AVG(fte_package) DESC LIMIT 1",
+    "expected_answer": {"kind": "sql_result", "value": "Google"}
+  },
+  {
+    "id": "sql_11",
+    "group": "sql",
+    "question": "How many Amazon placements are in the table?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Amazon'",
+    "expected_answer": {"kind": "sql_result", "value": 49}
+  },
+  {
+    "id": "sql_12",
+    "group": "sql",
+    "question": "How many rows have a stipend value?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(stipend) FROM placements",
+    "expected_answer": {"kind": "sql_result", "value": 306}
+  },
+  {
+    "id": "rag_01",
+    "group": "rag",
+    "question": "What minimum CGPA does Amazon require, and what is its active-backlog rule?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "amazon.txt", "required_facts": ["minimum CGPA of 7.0", "must not have any active backlogs"]}
+  },
+  {
+    "id": "rag_02",
+    "group": "rag",
+    "question": "What are Microsoft's CGPA and backlog requirements?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "microsoft.txt", "required_facts": ["minimum CGPA of 7.0", "must not have active backlogs"]}
+  },
+  {
+    "id": "rag_03",
+    "group": "rag",
+    "question": "For the TCS NQT pathway, how many active backlogs are allowed and when must they be cleared?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "tcs.txt", "required_facts": ["maximum of one active backlog", "cleared before joining"]}
+  },
+  {
+    "id": "rag_04",
+    "group": "rag",
+    "question": "What assessments and interviews are in Accenture's recruitment process?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "accenture.txt", "required_facts": ["cognitive and technical assessment", "communication assessment", "technical/HR interview"]}
+  },
+  {
+    "id": "rag_05",
+    "group": "rag",
+    "question": "What CGPA and backlog criteria does Adobe state?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "adobe.txt", "required_facts": ["minimum CGPA of 7.5", "active or historical backlogs"]}
+  },
+  {
+    "id": "rag_06",
+    "group": "rag",
+    "question": "What is Cognizant GenC's minimum CGPA and active backlog limit?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "cognizant.txt", "required_facts": ["minimum CGPA of 6.0", "not have more than one active backlog"]}
+  },
+  {
+    "id": "rag_07",
+    "group": "rag",
+    "question": "Summarize Deloitte's standing-backlog rule and its deadline for clearing backlogs.",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "deloitte.txt", "required_facts": ["not have more than one standing backlog", "cleared before the offer letter is issued"]}
+  },
+  {
+    "id": "rag_08",
+    "group": "rag",
+    "question": "What CGPA and backlog rules are listed for Goldman Sachs?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "goldman_sachs.txt", "required_facts": ["minimum CGPA of 7.5", "must not have any active backlogs"]}
+  },
+  {
+    "id": "rag_09",
+    "group": "rag",
+    "question": "What minimum CGPA does Google list for applying?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "google.txt", "required_facts": ["minimum CGPA of 8.0"]}
+  },
+  {
+    "id": "rag_10",
+    "group": "rag",
+    "question": "What stages does the Salesforce recruitment process include?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "salesforce.txt", "required_facts": ["online assessment", "two technical interview rounds", "one HR/values-fit round"]}
+  },
+  {
+    "id": "rag_11",
+    "group": "rag",
+    "question": "How many active backlogs can a Wipro applicant have, and by when must they be cleared?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "wipro.txt", "required_facts": ["maximum of one active backlog", "cleared before onboarding"]}
+  },
+  {
+    "id": "rag_12",
+    "group": "rag",
+    "question": "What CGPA and backlog rules are stated for LSEG?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "lseg.txt", "required_facts": ["minimum CGPA of 7.5", "active or historical backlogs"]}
+  },
+  {
+    "id": "rag_13",
+    "group": "rag",
+    "question": "How do TCS Digital and Prime CGPA cutoffs compare with the NQT minimum?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "tcs.txt", "required_facts": ["TCS NQT pathway", "Digital and Prime generally require CGPA of 7.0 and above"]}
+  },
+  {
+    "id": "hard_01",
+    "group": "hard",
+    "question": "Which employer hired the largest number of students?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT company FROM placements GROUP BY company ORDER BY COUNT(*) DESC, company LIMIT 1",
+    "expected_answer": {"kind": "sql_result", "value": "Adobe"}
+  },
+  {
+    "id": "hard_02",
+    "group": "hard",
+    "question": "What was the mean FTE offer for Amazon?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements WHERE company = 'Amazon'",
+    "expected_answer": {"kind": "sql_result", "value": 16.9729}
+  },
+  {
+    "id": "hard_03",
+    "group": "hard",
+    "question": "How meny placements were with Google?",
+    "expected_intent": "sql",
+    "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+    "expected_answer": {"kind": "sql_result", "value": 51}
+  },
+  {
+    "id": "hard_04",
+    "group": "hard",
+    "question": "What academic cutoff applies to Google?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "google.txt", "required_facts": ["minimum CGPA of 8.0"]}
+  },
+  {
+    "id": "hard_05",
+    "group": "hard",
+    "question": "Do I need to clear backlogs for Deloite?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "rag_facts", "source": "deloitte.txt", "required_facts": ["not have more than one standing backlog", "cleared before the offer letter is issued"]}
+  },
+  {
+    "id": "hard_06",
+    "group": "hard",
+    "question": "How many placements are there, and what CGPA does Amazon require?",
+    "expected_intent": "ambiguous",
+    "reference_sql": "SELECT COUNT(*) FROM placements",
+    "expected_answer": {"kind": "mixed_facts", "required_facts": ["minimum CGPA of 7.0"], "source": "amazon.txt", "required_sql_value": 600}
+  },
+  {
+    "id": "hard_07",
+    "group": "hard",
+    "question": "Which company has the highest package, and what technical interview rounds does Google use?",
+    "expected_intent": "ambiguous",
+    "reference_sql": "SELECT MAX(fte_package) FROM placements",
+    "expected_answer": {"kind": "mixed_facts", "required_facts": ["two to three technical interview rounds", "final HR/googleyness round"], "source": "google.txt", "required_sql_value": 39.46}
+  },
+  {
+    "id": "hard_08",
+    "group": "hard",
+    "question": "Who won the 2024 World Series?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "abstain"}
+  },
+  {
+    "id": "hard_09",
+    "group": "hard",
+    "question": "What is the weather in Seattle today?",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "abstain"}
+  },
+  {
+    "id": "hard_10",
+    "group": "hard",
+    "question": "Explain how to build a quantum computer.",
+    "expected_intent": "rag",
+    "expected_answer": {"kind": "abstain"}
+  }
+]
