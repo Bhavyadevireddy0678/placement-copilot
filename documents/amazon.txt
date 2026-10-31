@@ -14,5 +14,4 @@ Students must not have any active backlogs at the time of the recruitment proces
 Students must satisfy all placement cell eligibility requirements before applying.
 
 The required CGPA and backlog criteria may vary depending on the specific Amazon role.
-cat documents/amazon.txt
 
