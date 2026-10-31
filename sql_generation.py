@@ -1,4 +1,5 @@
 from sql_security import SQLValidationError, validate_generated_sql
+from resilience import resilient_chat_completion
 
 
 SQL_EXAMPLES = (
@@ -65,10 +66,12 @@ def strip_sql_fence(sql_text):
     return cleaned
 
 
-def generate_validated_sql(client, model_name, prompt):
+def generate_validated_sql(client, model_name, prompt, resilience=None):
     messages = [{"role": "user", "content": prompt}]
     for attempt in range(2):
-        response = client.chat.completions.create(
+        response = resilient_chat_completion(
+            client,
+            resilience,
             model=model_name,
             messages=messages,
             temperature=0,

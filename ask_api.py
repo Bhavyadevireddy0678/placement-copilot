@@ -18,6 +18,7 @@ from api_security import SlidingWindowRateLimiter, require_api_key
 from caches import CachedEmbeddingEncoder, TTLCache
 from sql_generation import build_sql_prompt, generate_validated_sql
 from retrieval import retrieve_chunks
+from resilience import CircuitBreaker, LLMResilience, LLMUnavailableError, resilient_chat_completion
 
 load_dotenv()
 
@@ -40,6 +41,12 @@ RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
 EMBEDDING_CACHE_SIZE = int(os.getenv("EMBEDDING_CACHE_SIZE", "512"))
 SQL_RESULT_CACHE_SIZE = int(os.getenv("SQL_RESULT_CACHE_SIZE", "128"))
 SQL_RESULT_CACHE_TTL_SECONDS = float(os.getenv("SQL_RESULT_CACHE_TTL_SECONDS", "30"))
+LLM_MAX_ATTEMPTS = int(os.getenv("LLM_MAX_ATTEMPTS", "3"))
+LLM_RETRY_BASE_SECONDS = float(os.getenv("LLM_RETRY_BASE_SECONDS", "0.2"))
+LLM_RETRY_MAX_SECONDS = float(os.getenv("LLM_RETRY_MAX_SECONDS", "2"))
+LLM_RETRY_JITTER_SECONDS = float(os.getenv("LLM_RETRY_JITTER_SECONDS", "0.1"))
+LLM_CIRCUIT_FAILURE_THRESHOLD = int(os.getenv("LLM_CIRCUIT_FAILURE_THRESHOLD", "5"))
+LLM_CIRCUIT_RESET_SECONDS = float(os.getenv("LLM_CIRCUIT_RESET_SECONDS", "30"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
 RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "0.7"))
 HYBRID_RETRIEVAL_ENABLED = os.getenv("HYBRID_RETRIEVAL_ENABLED", "false").lower() in {
@@ -110,12 +117,30 @@ async def lifespan(application):
     application.state.groq_client = Groq(
         api_key=api_key,
         timeout=float(os.getenv("GROQ_TIMEOUT_SECONDS", "30")),
-        max_retries=1,
+        max_retries=0,
     )
     application.state.classifier_client = Groq(
         api_key=api_key,
         timeout=5,
         max_retries=0,
+    )
+    circuit_breaker = CircuitBreaker(
+        failure_threshold=LLM_CIRCUIT_FAILURE_THRESHOLD,
+        recovery_timeout=LLM_CIRCUIT_RESET_SECONDS,
+    )
+    application.state.llm_resilience = LLMResilience(
+        circuit_breaker,
+        max_attempts=LLM_MAX_ATTEMPTS,
+        base_delay=LLM_RETRY_BASE_SECONDS,
+        max_delay=LLM_RETRY_MAX_SECONDS,
+        jitter_seconds=LLM_RETRY_JITTER_SECONDS,
+    )
+    application.state.classifier_resilience = LLMResilience(
+        circuit_breaker,
+        max_attempts=1,
+        base_delay=LLM_RETRY_BASE_SECONDS,
+        max_delay=LLM_RETRY_MAX_SECONDS,
+        jitter_seconds=LLM_RETRY_JITTER_SECONDS,
     )
     yield
     rag_engine.dispose()
@@ -220,7 +245,7 @@ def classify_intent(question):
     return intent or "rag"
 
 
-def route_question(question, classifier_client):
+def route_question(question, classifier_client, resilience=None):
     intent, route_reason = _keyword_intent(question)
     if intent is not None:
         return intent, route_reason
@@ -238,7 +263,9 @@ def route_question(question, classifier_client):
     {question}
     """
     try:
-        response = classifier_client.chat.completions.create(
+        response = resilient_chat_completion(
+            classifier_client,
+            resilience,
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
@@ -288,6 +315,7 @@ def answer_rag_question(
     request=None,
     started=None,
     embedding_encoder=None,
+    llm_resilience=None,
 ):
     timings = timings if timings is not None else new_timings()
     started = started if started is not None else time.perf_counter()
@@ -345,7 +373,9 @@ def answer_rag_question(
         """
         stage_started = time.perf_counter()
         try:
-            llm_response = groq_client.chat.completions.create(
+            llm_response = resilient_chat_completion(
+                groq_client,
+                llm_resilience,
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": rag_prompt}],
             )
@@ -359,6 +389,20 @@ def answer_rag_question(
             "sources": sources,
             "distance": closest_distance,
             "embedding_cache_hit": embedding_cache_hit,
+        }
+        return finish_ask_response(response, request, timings, started) if request else response
+    except LLMUnavailableError:
+        logger.warning("RAG response degraded because the LLM provider is unavailable")
+        response = {
+            "intent": "rag",
+            "question": question,
+            "route_reason": route_reason,
+            "answer": "Answer generation is temporarily unavailable. Please retry shortly.",
+            "sources": [],
+            "distance": None,
+            "error": True,
+            "degraded": True,
+            "embedding_cache_hit": locals().get("embedding_cache_hit", False),
         }
         return finish_ask_response(response, request, timings, started) if request else response
     except Exception:
@@ -399,6 +443,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
         intent, route_reason = route_question(
             question,
             request.app.state.classifier_client,
+            request.app.state.classifier_resilience,
         )
     finally:
         timings["routing"] = round((time.perf_counter() - stage_started) * 1000, 3)
@@ -413,6 +458,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
                     request.app.state.groq_client,
                     MODEL_NAME,
                     build_sql_prompt(question),
+                    resilience=request.app.state.llm_resilience,
                 )
             finally:
                 timings["sql_generation"] = round(
@@ -447,6 +493,16 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
                 "answer": answer
             }
             return finish_ask_response(response, request, timings, started)
+        except LLMUnavailableError:
+            logger.warning("SQL response degraded because the LLM provider is unavailable")
+            response = {
+                "answer": "SQL generation is temporarily unavailable. Please retry shortly.",
+                "intent": "sql",
+                "route_reason": route_reason,
+                "error": True,
+                "degraded": True,
+            }
+            return finish_ask_response(response, request, timings, started)
         except Exception as error:
             logger.exception("SQL question processing failed")
             response = {
@@ -467,4 +523,5 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
         request=request,
         started=started,
         embedding_encoder=request.app.state.embedding_encoder,
+        llm_resilience=request.app.state.llm_resilience,
     )
