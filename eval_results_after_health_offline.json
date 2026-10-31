@@ -1,0 +1,1011 @@
+{
+  "evaluation_name": "after_health_offline",
+  "evaluation_mode": "offline",
+  "dataset_path": "eval_set.json",
+  "case_count": 35,
+  "source_document_count": 12,
+  "document_ground_truth_facts_validated": 17,
+  "chunk_count": 22,
+  "csv_row_count": 600,
+  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_dimension": 384,
+  "retrieval_top_k": 3,
+  "abstention_distance_threshold": 0.7,
+  "measurements": {
+    "router": "ask_api.classify_intent",
+    "retrieval": "local exact cosine similarity over the same splitter settings; does not execute PostgreSQL/pgvector",
+    "sql_reference": "SQLite execution over synthetic_placements.csv; validates stored expected values only",
+    "answer_accuracy": "live HTTP endpoint only"
+  },
+  "metrics": {
+    "router_accuracy": {
+      "correct": 30,
+      "total": 33,
+      "responses_received": 33,
+      "rate": 0.9091,
+      "ambiguous_route_counts": {
+        "rag": 2
+      },
+      "offline_keyword_baseline": {
+        "correct": 30,
+        "total": 33,
+        "rate": 0.9091
+      },
+      "note": "Ambiguous expected_intent cases are excluded; live mode scores API route decisions."
+    },
+    "sql_accuracy": {
+      "correct": null,
+      "total": 15,
+      "responses_received": 0,
+      "rate": null,
+      "reference_data_validation": {
+        "correct": 17,
+        "total": 17,
+        "rate": 1.0
+      },
+      "note": "Live SQL answer accuracy requires --api-url; reference validation checks fixture SQL against the CSV, not generated SQL."
+    },
+    "rag_accuracy": {
+      "correct": null,
+      "total": 15,
+      "responses_received": 0,
+      "rate": null,
+      "offline_retrieved_context_fact_accuracy": {
+        "correct": 15,
+        "total": 15,
+        "rate": 1.0
+      },
+      "note": "Live answer accuracy requires --api-url; offline context-fact coverage is a retrieval proxy, not generated-answer accuracy."
+    },
+    "recall_at_3": {
+      "correct_sources": 17,
+      "total_source_cases": 17,
+      "responses_received": 17,
+      "rate": 1.0,
+      "mode": "local_exact_cosine_over_chunked_documents"
+    },
+    "abstention_correctness": {
+      "live_correct": null,
+      "live_total": 3,
+      "live_responses_received": 0,
+      "live_rate": null,
+      "offline_threshold_proxy_correct": 3,
+      "offline_threshold_proxy_total": 3,
+      "offline_threshold_proxy_rate": 1.0
+    }
+  },
+  "latency_ms": {
+    "model_load": {
+      "samples": 1,
+      "p50_ms": 3633.356,
+      "p95_ms": 3633.356
+    },
+    "corpus_embedding_and_prepare": {
+      "samples": 1,
+      "p50_ms": 111.57,
+      "p95_ms": 111.57
+    },
+    "router": {
+      "samples": 35,
+      "p50_ms": 0.003,
+      "p95_ms": 0.008
+    },
+    "embedding": {
+      "samples": 35,
+      "p50_ms": 5.324,
+      "p95_ms": 22.51
+    },
+    "vector_retrieval": {
+      "samples": 35,
+      "p50_ms": 0.026,
+      "p95_ms": 0.045
+    },
+    "offline_total_per_case": {
+      "samples": 35,
+      "p50_ms": 5.367,
+      "p95_ms": 22.557
+    },
+    "sql_reference_execution": {
+      "samples": 17,
+      "p50_ms": 0.022,
+      "p95_ms": 0.107
+    },
+    "live_http_total": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_routing": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_embedding": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_retrieval": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_sql_generation": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_sql_execution": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_llm": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "api_total": {
+      "samples": 0,
+      "p50_ms": null,
+      "p95_ms": null
+    },
+    "note": "API stage timings exclude HTTP serialization; live_http_total includes full client-observed duration."
+  },
+  "failures": [
+    {
+      "case_id": "hard_01",
+      "stage": "offline_keyword_router",
+      "expected": "sql",
+      "actual": "rag"
+    },
+    {
+      "case_id": "hard_02",
+      "stage": "offline_keyword_router",
+      "expected": "sql",
+      "actual": "rag"
+    },
+    {
+      "case_id": "hard_03",
+      "stage": "offline_keyword_router",
+      "expected": "sql",
+      "actual": "rag"
+    }
+  ],
+  "cases": [
+    {
+      "id": "sql_01",
+      "group": "sql",
+      "question": "How many placement rows are in the dataset?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "salesforce.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.711352,
+        0.718434,
+        0.719964
+      ],
+      "reference_sql_result": 600,
+      "timings_ms": {
+        "router": 0.037,
+        "embedding": 32.887,
+        "vector_retrieval": 0.068,
+        "offline_total": 32.995
+      }
+    },
+    {
+      "id": "sql_02",
+      "group": "sql",
+      "question": "What is the average FTE package?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "adobe.txt",
+        "lseg.txt"
+      ],
+      "offline_top3_distances": [
+        0.67292,
+        0.71114,
+        0.72086
+      ],
+      "reference_sql_result": 14.045,
+      "timings_ms": {
+        "router": 0.004,
+        "embedding": 22.51,
+        "vector_retrieval": 0.04,
+        "offline_total": 22.557
+      }
+    },
+    {
+      "id": "sql_03",
+      "group": "sql",
+      "question": "What is the highest package in the placement data?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "cognizant.txt",
+        "adobe.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.658879,
+        0.669147,
+        0.684084
+      ],
+      "reference_sql_result": 39.46,
+      "timings_ms": {
+        "router": 0.007,
+        "embedding": 4.658,
+        "vector_retrieval": 0.024,
+        "offline_total": 4.691
+      }
+    },
+    {
+      "id": "sql_04",
+      "group": "sql",
+      "question": "How many students were placed at Google?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "google.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.433889,
+        0.511545,
+        0.649185
+      ],
+      "reference_sql_result": 51,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 5.324,
+        "vector_retrieval": 0.038,
+        "offline_total": 5.367
+      }
+    },
+    {
+      "id": "sql_05",
+      "group": "sql",
+      "question": "What was Amazon's average package?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "amazon.txt",
+        "adobe.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.669383,
+        0.869713,
+        0.900176
+      ],
+      "reference_sql_result": 16.9729,
+      "timings_ms": {
+        "router": 0.005,
+        "embedding": 5.295,
+        "vector_retrieval": 0.026,
+        "offline_total": 5.328
+      }
+    },
+    {
+      "id": "sql_06",
+      "group": "sql",
+      "question": "How many placements came from each branch?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "lseg.txt",
+        "salesforce.txt",
+        "tcs.txt"
+      ],
+      "offline_top3_distances": [
+        0.602582,
+        0.625078,
+        0.669809
+      ],
+      "reference_sql_result": [
+        {
+          "branch": "CSE",
+          "total": 159
+        },
+        {
+          "branch": "CSE-AI",
+          "total": 144
+        },
+        {
+          "branch": "ECE",
+          "total": 149
+        },
+        {
+          "branch": "IT",
+          "total": 148
+        }
+      ],
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 17.318,
+        "vector_retrieval": 0.03,
+        "offline_total": 17.352
+      }
+    },
+    {
+      "id": "sql_07",
+      "group": "sql",
+      "question": "What is Deloitte's maximum FTE package?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "deloitte.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.509643,
+        0.57591,
+        0.689868
+      ],
+      "reference_sql_result": 7.99,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 15.95,
+        "vector_retrieval": 0.031,
+        "offline_total": 15.988
+      }
+    },
+    {
+      "id": "sql_08",
+      "group": "sql",
+      "question": "How many students were placed in November?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "salesforce.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.672432,
+        0.674218,
+        0.675619
+      ],
+      "reference_sql_result": 146,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.042,
+        "vector_retrieval": 0.022,
+        "offline_total": 4.07
+      }
+    },
+    {
+      "id": "sql_09",
+      "group": "sql",
+      "question": "How many different companies appear in the data?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "goldman_sachs.txt",
+        "deloitte.txt",
+        "google.txt"
+      ],
+      "offline_top3_distances": [
+        0.744345,
+        0.770534,
+        0.788842
+      ],
+      "reference_sql_result": 12,
+      "timings_ms": {
+        "router": 0.005,
+        "embedding": 4.988,
+        "vector_retrieval": 0.024,
+        "offline_total": 5.019
+      }
+    },
+    {
+      "id": "sql_10",
+      "group": "sql",
+      "question": "Which company has the highest average FTE package?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "adobe.txt",
+        "cognizant.txt",
+        "lseg.txt"
+      ],
+      "offline_top3_distances": [
+        0.673176,
+        0.71016,
+        0.723294
+      ],
+      "reference_sql_result": "Google",
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 4.073,
+        "vector_retrieval": 0.024,
+        "offline_total": 4.101
+      }
+    },
+    {
+      "id": "sql_11",
+      "group": "sql",
+      "question": "How many Amazon placements are in the table?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "amazon.txt",
+        "salesforce.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.547528,
+        0.770846,
+        0.774418
+      ],
+      "reference_sql_result": 49,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 5.264,
+        "vector_retrieval": 0.022,
+        "offline_total": 5.29
+      }
+    },
+    {
+      "id": "sql_12",
+      "group": "sql",
+      "question": "How many rows have a stipend value?",
+      "expected_intent": "sql",
+      "offline_intent": "sql",
+      "offline_top3_sources": [
+        "deloitte.txt",
+        "amazon.txt",
+        "tcs.txt"
+      ],
+      "offline_top3_distances": [
+        0.793085,
+        0.796229,
+        0.798044
+      ],
+      "reference_sql_result": 306,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 4.445,
+        "vector_retrieval": 0.021,
+        "offline_total": 4.47
+      }
+    },
+    {
+      "id": "rag_01",
+      "group": "rag",
+      "question": "What minimum CGPA does Amazon require, and what is its active-backlog rule?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "amazon.txt",
+        "salesforce.txt",
+        "microsoft.txt"
+      ],
+      "offline_top3_distances": [
+        0.239363,
+        0.583642,
+        0.584409
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.008,
+        "embedding": 14.092,
+        "vector_retrieval": 0.029,
+        "offline_total": 14.132
+      }
+    },
+    {
+      "id": "rag_02",
+      "group": "rag",
+      "question": "What are Microsoft's CGPA and backlog requirements?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "microsoft.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.349466,
+        0.474606,
+        0.529508
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.004,
+        "embedding": 15.541,
+        "vector_retrieval": 0.028,
+        "offline_total": 15.576
+      }
+    },
+    {
+      "id": "rag_03",
+      "group": "rag",
+      "question": "For the TCS NQT pathway, how many active backlogs are allowed and when must they be cleared?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "tcs.txt",
+        "cognizant.txt"
+      ],
+      "offline_top3_distances": [
+        0.421213,
+        0.680057,
+        0.714945
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 13.577,
+        "vector_retrieval": 0.028,
+        "offline_total": 13.609
+      }
+    },
+    {
+      "id": "rag_04",
+      "group": "rag",
+      "question": "What assessments and interviews are in Accenture's recruitment process?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "accenture.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.30314,
+        0.356059,
+        0.530978
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.107,
+        "vector_retrieval": 0.021,
+        "offline_total": 4.132
+      }
+    },
+    {
+      "id": "rag_05",
+      "group": "rag",
+      "question": "What CGPA and backlog criteria does Adobe state?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "adobe.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.3146,
+        0.348924,
+        0.52324
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 5.385,
+        "vector_retrieval": 0.026,
+        "offline_total": 5.415
+      }
+    },
+    {
+      "id": "rag_06",
+      "group": "rag",
+      "question": "What is Cognizant GenC's minimum CGPA and active backlog limit?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "cognizant.txt",
+        "tcs.txt"
+      ],
+      "offline_top3_distances": [
+        0.349024,
+        0.404409,
+        0.483028
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 13.62,
+        "vector_retrieval": 0.034,
+        "offline_total": 13.659
+      }
+    },
+    {
+      "id": "rag_07",
+      "group": "rag",
+      "question": "Summarize Deloitte's standing-backlog rule and its deadline for clearing backlogs.",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "deloitte.txt",
+        "lseg.txt"
+      ],
+      "offline_top3_distances": [
+        0.568635,
+        0.668858,
+        0.791282
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 13.794,
+        "vector_retrieval": 0.045,
+        "offline_total": 13.844
+      }
+    },
+    {
+      "id": "rag_08",
+      "group": "rag",
+      "question": "What CGPA and backlog rules are listed for Goldman Sachs?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "goldman_sachs.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.356639,
+        0.382345,
+        0.571727
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.004,
+        "embedding": 17.205,
+        "vector_retrieval": 0.03,
+        "offline_total": 17.241
+      }
+    },
+    {
+      "id": "rag_09",
+      "group": "rag",
+      "question": "What minimum CGPA does Google list for applying?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "google.txt",
+        "goldman_sachs.txt"
+      ],
+      "offline_top3_distances": [
+        0.225149,
+        0.299115,
+        0.346853
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 16.113,
+        "vector_retrieval": 0.03,
+        "offline_total": 16.148
+      }
+    },
+    {
+      "id": "rag_10",
+      "group": "rag",
+      "question": "What stages does the Salesforce recruitment process include?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "salesforce.txt",
+        "google.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.406418,
+        0.594833,
+        0.601815
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.358,
+        "vector_retrieval": 0.021,
+        "offline_total": 4.384
+      }
+    },
+    {
+      "id": "rag_11",
+      "group": "rag",
+      "question": "How many active backlogs can a Wipro applicant have, and by when must they be cleared?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "wipro.txt",
+        "deloitte.txt"
+      ],
+      "offline_top3_distances": [
+        0.353986,
+        0.43866,
+        0.633039
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 13.9,
+        "vector_retrieval": 0.033,
+        "offline_total": 13.939
+      }
+    },
+    {
+      "id": "rag_12",
+      "group": "rag",
+      "question": "What CGPA and backlog rules are stated for LSEG?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "lseg.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.35535,
+        0.430625,
+        0.525474
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 15.665,
+        "vector_retrieval": 0.038,
+        "offline_total": 15.709
+      }
+    },
+    {
+      "id": "rag_13",
+      "group": "rag",
+      "question": "How do TCS Digital and Prime CGPA cutoffs compare with the NQT minimum?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "tcs.txt",
+        "goldman_sachs.txt"
+      ],
+      "offline_top3_distances": [
+        0.408204,
+        0.521599,
+        0.702886
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.655,
+        "vector_retrieval": 0.028,
+        "offline_total": 4.688
+      }
+    },
+    {
+      "id": "hard_01",
+      "group": "hard",
+      "question": "Which employer hired the largest number of students?",
+      "expected_intent": "sql",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "adobe.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.648304,
+        0.676602,
+        0.685268
+      ],
+      "reference_sql_result": "Adobe",
+      "timings_ms": {
+        "router": 0.004,
+        "embedding": 5.493,
+        "vector_retrieval": 0.021,
+        "offline_total": 5.52
+      }
+    },
+    {
+      "id": "hard_02",
+      "group": "hard",
+      "question": "What was the mean FTE offer for Amazon?",
+      "expected_intent": "sql",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "amazon.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.583202,
+        0.750795,
+        0.796346
+      ],
+      "reference_sql_result": 16.9729,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 4.213,
+        "vector_retrieval": 0.025,
+        "offline_total": 4.242
+      }
+    },
+    {
+      "id": "hard_03",
+      "group": "hard",
+      "question": "How meny placements were with Google?",
+      "expected_intent": "sql",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "google.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.44667,
+        0.466558,
+        0.660459
+      ],
+      "reference_sql_result": 51,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.325,
+        "vector_retrieval": 0.022,
+        "offline_total": 4.351
+      }
+    },
+    {
+      "id": "hard_04",
+      "group": "hard",
+      "question": "What academic cutoff applies to Google?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "google.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.506696,
+        0.534461,
+        0.716042
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 4.638,
+        "vector_retrieval": 0.024,
+        "offline_total": 4.667
+      }
+    },
+    {
+      "id": "hard_05",
+      "group": "hard",
+      "question": "Do I need to clear backlogs for Deloite?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "deloitte.txt",
+        "lseg.txt"
+      ],
+      "offline_top3_distances": [
+        0.534397,
+        0.586311,
+        0.854133
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 5.541,
+        "vector_retrieval": 0.021,
+        "offline_total": 5.566
+      }
+    },
+    {
+      "id": "hard_06",
+      "group": "hard",
+      "question": "How many placements are there, and what CGPA does Amazon require?",
+      "expected_intent": "ambiguous",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "amazon.txt",
+        "salesforce.txt",
+        "adobe.txt"
+      ],
+      "offline_top3_distances": [
+        0.250738,
+        0.448397,
+        0.474651
+      ],
+      "reference_sql_result": 600,
+      "timings_ms": {
+        "router": 0.001,
+        "embedding": 14.011,
+        "vector_retrieval": 0.025,
+        "offline_total": 14.039
+      }
+    },
+    {
+      "id": "hard_07",
+      "group": "hard",
+      "question": "Which company has the highest package, and what technical interview rounds does Google use?",
+      "expected_intent": "ambiguous",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "google.txt",
+        "lseg.txt"
+      ],
+      "offline_top3_distances": [
+        0.541225,
+        0.56844,
+        0.704555
+      ],
+      "reference_sql_result": 39.46,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.532,
+        "vector_retrieval": 0.02,
+        "offline_total": 4.557
+      }
+    },
+    {
+      "id": "hard_08",
+      "group": "hard",
+      "question": "Who won the 2024 World Series?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "cognizant.txt",
+        "salesforce.txt",
+        "tcs.txt"
+      ],
+      "offline_top3_distances": [
+        0.928803,
+        0.945971,
+        0.96876
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 4.139,
+        "vector_retrieval": 0.016,
+        "offline_total": 4.158
+      }
+    },
+    {
+      "id": "hard_09",
+      "group": "hard",
+      "question": "What is the weather in Seattle today?",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "microsoft.txt",
+        "google.txt",
+        "salesforce.txt"
+      ],
+      "offline_top3_distances": [
+        0.993947,
+        1.000068,
+        1.00289
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.002,
+        "embedding": 5.076,
+        "vector_retrieval": 0.026,
+        "offline_total": 5.106
+      }
+    },
+    {
+      "id": "hard_10",
+      "group": "hard",
+      "question": "Explain how to build a quantum computer.",
+      "expected_intent": "rag",
+      "offline_intent": "rag",
+      "offline_top3_sources": [
+        "tcs.txt",
+        "google.txt"
+      ],
+      "offline_top3_distances": [
+        0.81683,
+        0.82461,
+        0.82977
+      ],
+      "reference_sql_result": null,
+      "timings_ms": {
+        "router": 0.003,
+        "embedding": 4.37,
+        "vector_retrieval": 0.019,
+        "offline_total": 4.394
+      }
+    }
+  ]
+}

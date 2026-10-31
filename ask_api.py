@@ -286,8 +286,8 @@ def home():
 
 
 @app.get("/health")
-def health():
-    return {"status": "alive"}
+def health(request: Request):
+    return readiness(request)
 
 
 @app.get("/ready")
