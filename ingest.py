@@ -64,8 +64,21 @@ def main():
                 cursor.execute("ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source text")
                 cursor.execute(
                     """
+                    ALTER TABLE chunks
+                    ADD COLUMN IF NOT EXISTS search_vector tsvector
+                    GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+                    """
+                )
+                cursor.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw_idx
                     ON chunks USING hnsw (embedding vector_cosine_ops)
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS chunks_search_vector_gin_idx
+                    ON chunks USING gin (search_vector)
                     """
                 )
                 cursor.execute(

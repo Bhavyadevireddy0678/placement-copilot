@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from api_security import SlidingWindowRateLimiter, require_api_key
 from sql_generation import build_sql_prompt, generate_validated_sql
+from retrieval import retrieve_chunks
 
 load_dotenv()
 
@@ -32,6 +33,11 @@ MODEL_NAME = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 API_KEY = os.getenv("API_KEY")
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "0.7"))
+HYBRID_RETRIEVAL_ENABLED = os.getenv("HYBRID_RETRIEVAL_ENABLED", "false").lower() in {
+    "1", "true", "yes", "on"
+}
 rate_limiter = SlidingWindowRateLimiter(
     RATE_LIMIT_REQUESTS,
     RATE_LIMIT_WINDOW_SECONDS,
@@ -268,23 +274,17 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
     query_embedding = request.app.state.embedding_model.encode(question)
 
     with rag_engine.connect() as conn:
-        results = conn.execute(
-            text(
-                """
-                SELECT content,
-                       source,
-                       embedding <=> :embedding AS distance
-                FROM chunks
-                ORDER BY distance
-                LIMIT 3
-                """
-            ),
-            {"embedding": query_embedding},
-        ).fetchall()
+        results = retrieve_chunks(
+            conn,
+            question,
+            query_embedding,
+            top_k=RAG_TOP_K,
+            hybrid=HYBRID_RETRIEVAL_ENABLED,
+        )
 
     closest_distance = float(results[0][2]) if results else None
 
-    if closest_distance is None or closest_distance > 0.7:
+    if closest_distance is None or closest_distance > RAG_DISTANCE_THRESHOLD:
         return {
             "answer": "I don't have enough information in the company documents to answer that.",
             "intent": "rag",

@@ -34,11 +34,14 @@ CREATE TABLE IF NOT EXISTS chunks (
     id SERIAL PRIMARY KEY,
     content text NOT NULL,
     embedding vector(384) NOT NULL,
-    source text NOT NULL
+    source text NOT NULL,
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 );
 
 CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw_idx
     ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS chunks_search_vector_gin_idx
+    ON chunks USING gin (search_vector);
 
 SELECT format('GRANT CONNECT ON DATABASE %I TO rag_readonly', :'database_name') \gexec
 REVOKE ALL ON SCHEMA public FROM rag_readonly;
