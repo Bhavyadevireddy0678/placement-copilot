@@ -12,7 +12,7 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from api_security import SlidingWindowRateLimiter, require_api_key
-from sql_security import SQLValidationError, validate_generated_sql
+from sql_generation import build_sql_prompt, generate_validated_sql
 
 load_dotenv()
 
@@ -232,51 +232,11 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
 
     if intent == "sql":
         try:
-            prompt = f"""
-            You are a PostgreSQL expert.
-
-            Table schema:
-
-            placements(
-                student_id,
-                student_name,
-                branch,
-                company,
-                stipend,
-                fte_package,
-                month_placed
+            validated_query = generate_validated_sql(
+                request.app.state.groq_client,
+                MODEL_NAME,
+                build_sql_prompt(question),
             )
-
-            Return ONLY valid PostgreSQL SQL.
-
-            Question:
-            {question}
-            """
-
-            response = request.app.state.groq_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            )
-
-            sql_query = response.choices[0].message.content.strip()
-            sql_query = sql_query.replace("```sql", "")
-            sql_query = sql_query.replace("```", "")
-            sql_query = sql_query.strip()
-
-            try:
-                validated_query = validate_generated_sql(sql_query)
-            except SQLValidationError:
-                return {
-                    "answer": "I can only answer with read queries.",
-                    "intent": "sql",
-                    "route_reason": route_reason,
-                    "error": True
-                }
 
             with sql_engine.begin() as conn:
                 conn.execute(text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}"))
