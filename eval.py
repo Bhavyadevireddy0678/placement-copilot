@@ -301,6 +301,34 @@ def latency_summary(samples):
     }
 
 
+def run_cache_probe(api_url, timeout_seconds):
+    probe_questions = {
+        "rag": "What CGPA is needed for Google?",
+        "sql": "How many Amazon placements are in the table?",
+    }
+    cache_probe = {}
+    for kind, probe_question in probe_questions.items():
+        try:
+            responses = []
+            client_timings = []
+            for _ in range(2):
+                started = time.perf_counter()
+                response = post_question(api_url, probe_question, timeout_seconds)
+                client_timings.append(round((time.perf_counter() - started) * 1000, 3))
+                responses.append(response)
+            cache_field = "embedding_cache_hit" if kind == "rag" else "cache_hit"
+            cache_probe[kind] = {
+                "question": probe_question,
+                "client_total_ms": client_timings,
+                "timings_ms": [response.get("timings_ms") for response in responses],
+                "cache_hits": [response.get(cache_field) for response in responses],
+                "errors": [response.get("error") for response in responses],
+            }
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+            cache_probe[kind] = {"error": str(error)}
+    return cache_probe
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", default="baseline", help="Output name suffix")
@@ -311,7 +339,34 @@ def main():
     )
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--http-timeout", type=float, default=60)
+    parser.add_argument(
+        "--cache-probe",
+        action="store_true",
+        help="Measure repeated identical live RAG and SQL requests after the main eval.",
+    )
+    parser.add_argument(
+        "--cache-probe-only",
+        action="store_true",
+        help="Run only the repeated-request cache probe, without the 35-case suite.",
+    )
     args = parser.parse_args()
+
+    if args.cache_probe_only:
+        if not args.api_url:
+            parser.error("--cache-probe-only requires --api-url")
+        report = {
+            "evaluation_name": args.name,
+            "evaluation_mode": "live_cache_probe",
+            "cache_probe": run_cache_probe(args.api_url, args.http_timeout),
+        }
+        output_path = BASE_DIR / f"eval_results_{args.name}.json"
+        output_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps(report["cache_probe"], indent=2, ensure_ascii=False))
+        print(f"Saved: {output_path.name}")
+        return
 
     cases = load_eval_set()
     document_facts_validated = validate_document_ground_truth(cases)
@@ -707,6 +762,9 @@ def main():
         "failures": failures,
         "cases": results,
     }
+    if args.cache_probe and args.api_url:
+        report["cache_probe"] = run_cache_probe(args.api_url, args.http_timeout)
+
     output_path = BASE_DIR / f"eval_results_{args.name}.json"
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -731,6 +789,15 @@ def main():
     for stage in ("router", "embedding", "vector_retrieval", "offline_total_per_case", "sql_reference_execution", "live_http_total"):
         print(f"  {stage}: {latency[stage]['p50_ms']}/{latency[stage]['p95_ms']}")
     print(f"Failure rows: {len(failures)}")
+    if report.get("cache_probe"):
+        print("Cache probe:")
+        for kind, probe in report["cache_probe"].items():
+            timings = probe.get("timings_ms") or []
+            print(
+                f"  {kind}: cache_hit {probe.get('cache_hits')}; endpoint_total_ms "
+                f"{[timing.get('total') if timing else None for timing in timings]}; "
+                f"client_total_ms {probe.get('client_total_ms')}"
+            )
     if failures:
         print("case_id | stage | detail")
         for failure in failures:

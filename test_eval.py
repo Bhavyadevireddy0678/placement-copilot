@@ -1,4 +1,4 @@
-from eval import answer_is_correct, fact_is_present
+from eval import answer_is_correct, fact_is_present, run_cache_probe
 
 
 def test_fact_matching_ignores_markdown_and_punctuation():
@@ -59,3 +59,21 @@ def test_sql_group_results_ignore_row_order():
     ]
 
     assert values_equal(expected, actual)
+
+
+def test_cache_probe_submits_identical_rag_and_sql_requests(monkeypatch):
+    import eval as eval_module
+
+    requests = []
+
+    def fake_post(api_url, question, timeout_seconds):
+        requests.append((api_url, question, timeout_seconds))
+        return {"timings_ms": {"total": 1}, "embedding_cache_hit": len(requests) == 2}
+
+    monkeypatch.setattr(eval_module, "post_question", fake_post)
+    probe = run_cache_probe("http://test", 10)
+
+    assert len(requests) == 4
+    assert requests[0][1] == requests[1][1]
+    assert requests[2][1] == requests[3][1]
+    assert probe["rag"]["cache_hits"] == [False, True]

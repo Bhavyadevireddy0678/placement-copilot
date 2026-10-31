@@ -15,6 +15,7 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from api_security import SlidingWindowRateLimiter, require_api_key
+from caches import CachedEmbeddingEncoder, TTLCache
 from sql_generation import build_sql_prompt, generate_validated_sql
 from retrieval import retrieve_chunks
 
@@ -36,6 +37,9 @@ MODEL_NAME = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 API_KEY = os.getenv("API_KEY")
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+EMBEDDING_CACHE_SIZE = int(os.getenv("EMBEDDING_CACHE_SIZE", "512"))
+SQL_RESULT_CACHE_SIZE = int(os.getenv("SQL_RESULT_CACHE_SIZE", "128"))
+SQL_RESULT_CACHE_TTL_SECONDS = float(os.getenv("SQL_RESULT_CACHE_TTL_SECONDS", "30"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
 RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "0.7"))
 HYBRID_RETRIEVAL_ENABLED = os.getenv("HYBRID_RETRIEVAL_ENABLED", "false").lower() in {
@@ -45,6 +49,7 @@ rate_limiter = SlidingWindowRateLimiter(
     RATE_LIMIT_REQUESTS,
     RATE_LIMIT_WINDOW_SECONDS,
 )
+sql_result_cache = TTLCache(SQL_RESULT_CACHE_SIZE, SQL_RESULT_CACHE_TTL_SECONDS)
 
 rag_engine = (
     create_engine(
@@ -98,6 +103,10 @@ async def lifespan(application):
     if embedding_model.get_sentence_embedding_dimension() != 384:
         raise RuntimeError("EMBEDDING_MODEL must produce 384-dimensional vectors")
     application.state.embedding_model = embedding_model
+    application.state.embedding_encoder = CachedEmbeddingEncoder(
+        embedding_model,
+        EMBEDDING_CACHE_SIZE,
+    )
     application.state.groq_client = Groq(
         api_key=api_key,
         timeout=float(os.getenv("GROQ_TIMEOUT_SECONDS", "30")),
@@ -278,13 +287,20 @@ def answer_rag_question(
     timings=None,
     request=None,
     started=None,
+    embedding_encoder=None,
 ):
     timings = timings if timings is not None else new_timings()
     started = started if started is not None else time.perf_counter()
     try:
         stage_started = time.perf_counter()
         try:
-            query_embedding = embedding_model.encode(question)
+            if embedding_encoder is None:
+                query_embedding = embedding_model.encode(question)
+                embedding_cache_hit = False
+            else:
+                query_embedding, embedding_cache_hit = embedding_encoder.encode_with_status(
+                    question
+                )
         finally:
             timings["embedding"] = round((time.perf_counter() - stage_started) * 1000, 3)
 
@@ -310,6 +326,7 @@ def answer_rag_question(
                 "route_reason": route_reason,
                 "sources": [],
                 "distance": closest_distance,
+                "embedding_cache_hit": embedding_cache_hit,
             }
             return finish_ask_response(response, request, timings, started) if request else response
 
@@ -341,6 +358,7 @@ def answer_rag_question(
             "answer": llm_response.choices[0].message.content,
             "sources": sources,
             "distance": closest_distance,
+            "embedding_cache_hit": embedding_cache_hit,
         }
         return finish_ask_response(response, request, timings, started) if request else response
     except Exception:
@@ -353,6 +371,7 @@ def answer_rag_question(
             "sources": [],
             "distance": None,
             "error": True,
+            "embedding_cache_hit": locals().get("embedding_cache_hit", False),
         }
         return finish_ask_response(response, request, timings, started) if request else response
 
@@ -402,26 +421,29 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
 
             stage_started = time.perf_counter()
             try:
-                with sql_engine.begin() as conn:
-                    conn.execute(text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}"))
-                    result = conn.execute(text(validated_query.sql))
-                    rows = result.fetchall()
-                    column_names = list(result.keys())
+                cache_hit, answer = sql_result_cache.get(validated_query.sql)
+                if not cache_hit:
+                    with sql_engine.begin() as conn:
+                        conn.execute(text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}"))
+                        result = conn.execute(text(validated_query.sql))
+                        rows = result.fetchall()
+                        column_names = list(result.keys())
+                    if len(rows) == 1 and len(column_names) == 1:
+                        answer = rows[0][0]
+                    else:
+                        answer = [dict(zip(column_names, row)) for row in rows]
+                    sql_result_cache.set(validated_query.sql, answer)
             finally:
                 timings["sql_execution"] = round(
                     (time.perf_counter() - stage_started) * 1000, 3
                 )
-
-            if len(rows) == 1 and len(column_names) == 1:
-                answer = rows[0][0]
-            else:
-                answer = [dict(zip(column_names, row)) for row in rows]
 
             response = {
                 "intent": "sql",
                 "question": question,
                 "route_reason": route_reason,
                 "generated_sql": validated_query.sql,
+                "cache_hit": cache_hit,
                 "answer": answer
             }
             return finish_ask_response(response, request, timings, started)
@@ -444,4 +466,5 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
         timings=timings,
         request=request,
         started=started,
+        embedding_encoder=request.app.state.embedding_encoder,
     )
