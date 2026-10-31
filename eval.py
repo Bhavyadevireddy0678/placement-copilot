@@ -339,6 +339,8 @@ def main():
     }
     router_correct = 0
     router_scored = 0
+    live_router_correct = 0
+    live_router_responses = 0
     context_fact_correct = 0
     context_fact_total = 0
     retrieval_correct = 0
@@ -371,7 +373,7 @@ def main():
                 failures.append(
                     {
                         "case_id": case["id"],
-                        "stage": "router",
+                        "stage": "offline_keyword_router",
                         "expected": expected_intent,
                         "actual": predicted_intent,
                     }
@@ -468,15 +470,22 @@ def main():
                 record["live_total_ms"] = round(live_total_ms, 3)
                 live_intent = live_response.get("intent")
                 record["live_intent"] = live_intent
-                if expected_intent in ("sql", "rag") and live_intent != expected_intent:
-                    failures.append(
-                        {
-                            "case_id": case["id"],
-                            "stage": "live_router",
-                            "expected": expected_intent,
-                            "actual": live_intent,
-                        }
-                    )
+                record["route_reason"] = live_response.get("route_reason")
+                if expected_intent in ("sql", "rag"):
+                    if live_intent is not None:
+                        live_router_responses += 1
+                    if live_intent == expected_intent:
+                        live_router_correct += 1
+                    else:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "live_router",
+                                "expected": expected_intent,
+                                "actual": live_intent,
+                                "route_reason": live_response.get("route_reason"),
+                            }
+                        )
                 if kind == "sql_result":
                     live_sql_total += 1
                     correct = answer_is_correct(case, live_response)
@@ -575,13 +584,20 @@ def main():
         retrieval_correct = live_retrieval_correct
         retrieval_total = expected_source_cases
 
+    router_correct_metric = live_router_correct if args.api_url else router_correct
     metrics = {
         "router_accuracy": {
-            "correct": router_correct,
+            "correct": router_correct_metric,
             "total": router_scored,
-            "rate": round(router_correct / router_scored, 4) if router_scored else None,
+            "responses_received": live_router_responses if args.api_url else router_scored,
+            "rate": round(router_correct_metric / router_scored, 4) if router_scored else None,
             "ambiguous_route_counts": ambiguous_routes,
-            "note": "Ambiguous expected_intent cases are excluded from accuracy.",
+            "offline_keyword_baseline": {
+                "correct": router_correct,
+                "total": router_scored,
+                "rate": round(router_correct / router_scored, 4) if router_scored else None,
+            },
+            "note": "Ambiguous expected_intent cases are excluded; live mode scores API route decisions.",
         },
         "sql_accuracy": {
             "correct": live_sql_correct if args.api_url else None,

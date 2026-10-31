@@ -94,6 +94,11 @@ async def lifespan(application):
         timeout=float(os.getenv("GROQ_TIMEOUT_SECONDS", "30")),
         max_retries=1,
     )
+    application.state.classifier_client = Groq(
+        api_key=api_key,
+        timeout=5,
+        max_retries=0,
+    )
     yield
     rag_engine.dispose()
     sql_engine.dispose()
@@ -103,7 +108,7 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-def classify_intent(question):
+def _keyword_intent(question):
     question = question.lower()
 
     document_keywords = [
@@ -114,9 +119,6 @@ def classify_intent(question):
         "process",
         "interview"
     ]
-
-    if any(keyword in question for keyword in document_keywords):
-        return "rag"
 
     sql_keywords = [
         "how many",
@@ -133,11 +135,53 @@ def classify_intent(question):
         "salary"
     ]
 
-    for keyword in sql_keywords:
-        if keyword in question:
-            return "sql"
+    document_match = any(keyword in question for keyword in document_keywords)
+    sql_match = any(keyword in question for keyword in sql_keywords)
+    if document_match and sql_match:
+        return None, "conflicting_keywords"
+    if document_match:
+        return "rag", "keyword_rag"
+    if sql_match:
+        return "sql", "keyword_sql"
+    return None, "unmatched"
 
-    return "rag"
+
+def classify_intent(question):
+    intent, _ = _keyword_intent(question)
+    return intent or "rag"
+
+
+def route_question(question, classifier_client):
+    intent, route_reason = _keyword_intent(question)
+    if intent is not None:
+        return intent, route_reason
+    if classifier_client is None:
+        return "rag", "default_rag_classifier_unavailable"
+
+    prompt = f"""
+    Classify the user's primary question as exactly one token: sql or rag.
+    Return no explanation, punctuation, or other text.
+    Use sql for exact counts, sums, averages, rankings, or filters over placement records.
+    Use rag for eligibility rules, company processes, interviews, and document facts.
+    If the question is mixed or unclear, choose the dominant information source.
+
+    Question:
+    {question}
+    """
+    try:
+        response = classifier_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        label = (response.choices[0].message.content or "").strip().lower()
+        if label not in {"sql", "rag"}:
+            return "rag", "default_rag_invalid_classifier_output"
+        suffix = "conflict" if route_reason == "conflicting_keywords" else "unmatched"
+        return label, f"llm_fallback_{suffix}_{label}"
+    except Exception:
+        logger.exception("Intent classifier failed; defaulting to RAG")
+        return "rag", "default_rag_classifier_error"
 
 
 @app.get("/")
@@ -181,7 +225,10 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
     if not question:
         raise HTTPException(status_code=422, detail="Question must not be blank")
 
-    intent = classify_intent(question)
+    intent, route_reason = route_question(
+        question,
+        request.app.state.classifier_client,
+    )
 
     if intent == "sql":
         try:
@@ -227,6 +274,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
                 return {
                     "answer": "I can only answer with read queries.",
                     "intent": "sql",
+                    "route_reason": route_reason,
                     "error": True
                 }
 
@@ -244,6 +292,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
             return {
                 "intent": "sql",
                 "question": question,
+                "route_reason": route_reason,
                 "generated_sql": validated_query.sql,
                 "answer": answer
             }
@@ -252,6 +301,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
             return {
                 "answer": "I couldn't process that as a database query — try rephrasing.",
                 "intent": "sql",
+                "route_reason": route_reason,
                 "error": True
             }
 
@@ -277,6 +327,8 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
     if closest_distance is None or closest_distance > 0.7:
         return {
             "answer": "I don't have enough information in the company documents to answer that.",
+            "intent": "rag",
+            "route_reason": route_reason,
             "sources": [],
             "distance": closest_distance
         }
@@ -311,6 +363,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
     return {
         "intent": "rag",
         "question": question,
+        "route_reason": route_reason,
         "answer": answer,
         "sources": sources,
         "distance": closest_distance
