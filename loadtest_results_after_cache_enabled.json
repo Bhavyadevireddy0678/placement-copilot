@@ -1,0 +1,562 @@
+{
+  "name": "after_cache_enabled",
+  "path": "/ask",
+  "question": "What CGPA is needed for Google?",
+  "results": [
+    {
+      "concurrency": 1,
+      "requests_per_client": 1,
+      "requests": 1,
+      "successful_http_responses": 1,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 1
+      },
+      "wall_time_seconds": 0.142,
+      "throughput_requests_per_second": 7.032,
+      "successful_throughput_per_second": 7.032,
+      "latency_p50_ms": 142.007,
+      "latency_p95_ms": 142.007,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 142.007,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.006,
+            "embedding": 93.726,
+            "retrieval": 39.702,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 133.472
+          }
+        }
+      ]
+    },
+    {
+      "concurrency": 10,
+      "requests_per_client": 1,
+      "requests": 10,
+      "successful_http_responses": 10,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "wall_time_seconds": 0.032,
+      "throughput_requests_per_second": 307.726,
+      "successful_throughput_per_second": 307.726,
+      "latency_p50_ms": 30.031,
+      "latency_p95_ms": 31.198,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.176,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.006,
+            "embedding": 0.001,
+            "retrieval": 3.818,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 3.846
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 22.015,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 17.167,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 17.19
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 23.938,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 19.449,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 19.468
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 30.953,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.005,
+            "embedding": 0.001,
+            "retrieval": 26.293,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 26.313
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 30.031,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 25.501,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.521
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 30.29,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 25.55,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.563
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 27.136,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 22.132,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 22.149
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 30.814,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 25.665,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.678
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 31.198,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.002,
+            "embedding": 0.001,
+            "retrieval": 25.987,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.999
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 31.159,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 26.026,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 26.044
+          }
+        }
+      ]
+    },
+    {
+      "concurrency": 25,
+      "requests_per_client": 1,
+      "requests": 25,
+      "successful_http_responses": 25,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 25
+      },
+      "wall_time_seconds": 0.047,
+      "throughput_requests_per_second": 536.152,
+      "successful_throughput_per_second": 536.152,
+      "latency_p50_ms": 38.755,
+      "latency_p95_ms": 44.999,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 9.406,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.005,
+            "embedding": 0.002,
+            "retrieval": 3.893,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 3.915
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 19.258,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 6.014,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 6.027
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 11.102,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 6.236,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 6.253
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 45.165,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 35.307,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 35.325
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 31.559,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 17.499,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 17.519
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 25.518,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 8.343,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 8.363
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 44.665,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 35.529,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 35.545
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 25.953,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 7.18,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 7.198
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 44.331,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 33.764,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 33.802
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 44.999,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 36.082,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 36.101
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 44.356,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 34.538,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 34.555
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 41.703,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 31.072,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 31.085
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 41.735,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 31.287,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 31.302
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 43.597,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 32.808,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 32.828
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 43.818,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 33.174,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 33.195
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 35.868,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 25.588,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.601
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 44.053,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 34.384,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 34.398
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 33.742,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 14.315,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 14.33
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 33.658,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 14.599,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 14.617
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 34.259,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 24.064,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 24.079
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 38.755,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 26.81,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 26.826
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 38.689,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.0,
+            "retrieval": 27.054,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 27.066
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 35.378,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.002,
+            "embedding": 0.001,
+            "retrieval": 25.38,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 25.391
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 42.288,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.003,
+            "embedding": 0.001,
+            "retrieval": 30.747,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 30.762
+          }
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 40.787,
+          "degraded": false,
+          "timings_ms": {
+            "routing": 0.004,
+            "embedding": 0.001,
+            "retrieval": 29.95,
+            "sql_generation": null,
+            "sql_execution": null,
+            "llm": null,
+            "total": 29.966
+          }
+        }
+      ]
+    }
+  ]
+}

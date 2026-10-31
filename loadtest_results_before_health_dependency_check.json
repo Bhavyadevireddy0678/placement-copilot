@@ -1,0 +1,274 @@
+{
+  "name": "before_health_dependency_check",
+  "path": "/health",
+  "question": null,
+  "results": [
+    {
+      "concurrency": 1,
+      "requests_per_client": 1,
+      "requests": 1,
+      "successful_http_responses": 1,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 1
+      },
+      "wall_time_seconds": 0.007,
+      "throughput_requests_per_second": 148.416,
+      "successful_throughput_per_second": 148.416,
+      "latency_p50_ms": 6.536,
+      "latency_p95_ms": 6.536,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.536,
+          "degraded": false,
+          "timings_ms": null
+        }
+      ]
+    },
+    {
+      "concurrency": 10,
+      "requests_per_client": 1,
+      "requests": 10,
+      "successful_http_responses": 10,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "wall_time_seconds": 0.005,
+      "throughput_requests_per_second": 1918.741,
+      "successful_throughput_per_second": 1918.741,
+      "latency_p50_ms": 3.925,
+      "latency_p95_ms": 4.19,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.046,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 2.815,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 4.19,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.601,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.469,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 4.139,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.983,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.957,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.925,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 4.075,
+          "degraded": false,
+          "timings_ms": null
+        }
+      ]
+    },
+    {
+      "concurrency": 25,
+      "requests_per_client": 1,
+      "requests": 25,
+      "successful_http_responses": 25,
+      "degraded_responses": 0,
+      "status_counts": {
+        "200": 25
+      },
+      "wall_time_seconds": 0.01,
+      "throughput_requests_per_second": 2493.206,
+      "successful_throughput_per_second": 2493.206,
+      "latency_p50_ms": 6.95,
+      "latency_p95_ms": 7.364,
+      "per_request": [
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.347,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 4.383,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 5.354,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 3.079,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 5.211,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.097,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.966,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 5.843,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.95,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.765,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.692,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.565,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.618,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.338,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.339,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.217,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.179,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.364,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.194,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.119,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.586,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 6.803,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.238,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.025,
+          "degraded": false,
+          "timings_ms": null
+        },
+        {
+          "status_code": 200,
+          "elapsed_ms": 7.03,
+          "degraded": false,
+          "timings_ms": null
+        }
+      ]
+    }
+  ]
+}
