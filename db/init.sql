@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS placements (
     month_placed text
 );
 
+CREATE INDEX IF NOT EXISTS placements_company_idx ON placements (company);
+CREATE INDEX IF NOT EXISTS placements_branch_idx ON placements (branch);
+
 CREATE TABLE IF NOT EXISTS chunks (
     id SERIAL PRIMARY KEY,
     content text NOT NULL,

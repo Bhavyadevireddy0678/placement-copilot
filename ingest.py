@@ -63,6 +63,12 @@ def main():
             with connection.cursor() as cursor:
                 cursor.execute("ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source text")
                 cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS placements_company_idx ON placements (company)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS placements_branch_idx ON placements (branch)"
+                )
+                cursor.execute(
                     """
                     ALTER TABLE chunks
                     ADD COLUMN IF NOT EXISTS search_vector tsvector

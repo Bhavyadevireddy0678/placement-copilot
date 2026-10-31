@@ -1,0 +1,29 @@
+{
+  "database": "local PostgreSQL 16 / pgvector",
+  "rows_in_placements": 600,
+  "indexes_added": [
+    "placements_company_idx on placements(company)",
+    "placements_branch_idx on placements(branch)"
+  ],
+  "before": {
+    "company_query": {
+      "sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+      "plan": "Aggregate -> Seq Scan on placements; 51 rows matched, 549 removed; 7 shared buffers hit; execution 0.076 ms"
+    },
+    "branch_query": {
+      "sql": "SELECT COUNT(*) FROM placements WHERE branch = 'CSE'",
+      "plan": "Aggregate -> Seq Scan on placements; 159 rows matched, 441 removed; 7 shared buffers hit; execution 0.049 ms"
+    }
+  },
+  "after": {
+    "company_query": {
+      "sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+      "plan": "Aggregate -> Bitmap Heap Scan -> Bitmap Index Scan on placements_company_idx; 51 rows matched; 7 shared buffers hit, 1 read; execution 0.042 ms"
+    },
+    "branch_query": {
+      "sql": "SELECT COUNT(*) FROM placements WHERE branch = 'CSE'",
+      "plan": "Aggregate -> Seq Scan on placements; 159 rows matched, 441 removed; 7 shared buffers hit; execution 0.054 ms"
+    }
+  },
+  "interpretation": "Company lookup used the index and was faster in this run. Branch lookup remained a sequential scan because it returns 159 of 600 rows; the index is available but the planner estimated scanning the small table to be preferable. Single-run sub-millisecond timings are not sufficient to claim a general performance improvement."
+}
