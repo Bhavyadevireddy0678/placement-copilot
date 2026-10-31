@@ -1,6 +1,9 @@
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+import time
+import uuid
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -114,6 +117,57 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    request.state.request_id = request_id[:128]
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request.state.request_id
+        return response
+    finally:
+        log_entry = {
+            "event": "http_request",
+            "request_id": request.state.request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": status_code,
+            "total_ms": round((time.perf_counter() - started) * 1000, 3),
+            "intent": getattr(request.state, "intent", None),
+            "route_reason": getattr(request.state, "route_reason", None),
+            "timings_ms": getattr(request.state, "timings_ms", None),
+        }
+        logger.info(json.dumps(log_entry, separators=(",", ":")))
+
+
+TIMING_STAGES = (
+    "routing",
+    "embedding",
+    "retrieval",
+    "sql_generation",
+    "sql_execution",
+    "llm",
+    "total",
+)
+
+
+def new_timings():
+    return {stage: None for stage in TIMING_STAGES}
+
+
+def finish_ask_response(response, request, timings, started):
+    timings["total"] = round((time.perf_counter() - started) * 1000, 3)
+    request.state.timings_ms = timings
+    request.state.intent = response.get("intent")
+    request.state.route_reason = response.get("route_reason")
+    response["timings_ms"] = timings
+    response["request_id"] = request.state.request_id
+    return response
+
+
 def _keyword_intent(question):
     question = question.lower()
 
@@ -215,9 +269,26 @@ def readiness(request: Request):
     return {"status": "ready"}
 
 
-def answer_rag_question(question, route_reason, embedding_model, groq_client, engine):
+def answer_rag_question(
+    question,
+    route_reason,
+    embedding_model,
+    groq_client,
+    engine,
+    timings=None,
+    request=None,
+    started=None,
+):
+    timings = timings if timings is not None else new_timings()
+    started = started if started is not None else time.perf_counter()
     try:
-        query_embedding = embedding_model.encode(question)
+        stage_started = time.perf_counter()
+        try:
+            query_embedding = embedding_model.encode(question)
+        finally:
+            timings["embedding"] = round((time.perf_counter() - stage_started) * 1000, 3)
+
+        stage_started = time.perf_counter()
         with engine.begin() as connection:
             connection.execute(
                 text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}")
@@ -229,16 +300,18 @@ def answer_rag_question(question, route_reason, embedding_model, groq_client, en
                 top_k=RAG_TOP_K,
                 hybrid=HYBRID_RETRIEVAL_ENABLED,
             )
+        timings["retrieval"] = round((time.perf_counter() - stage_started) * 1000, 3)
 
         closest_distance = float(results[0][2]) if results else None
         if closest_distance is None or closest_distance > RAG_DISTANCE_THRESHOLD:
-            return {
+            response = {
                 "answer": "I don't have enough information in the company documents to answer that.",
                 "intent": "rag",
                 "route_reason": route_reason,
                 "sources": [],
                 "distance": closest_distance,
             }
+            return finish_ask_response(response, request, timings, started) if request else response
 
         context = "\n---\n".join(row[0] for row in results)
         sources = list(dict.fromkeys(row[1] for row in results))
@@ -253,21 +326,26 @@ def answer_rag_question(question, route_reason, embedding_model, groq_client, en
         Question:
         {question}
         """
-        response = groq_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": rag_prompt}],
-        )
-        return {
+        stage_started = time.perf_counter()
+        try:
+            llm_response = groq_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": rag_prompt}],
+            )
+        finally:
+            timings["llm"] = round((time.perf_counter() - stage_started) * 1000, 3)
+        response = {
             "intent": "rag",
             "question": question,
             "route_reason": route_reason,
-            "answer": response.choices[0].message.content,
+            "answer": llm_response.choices[0].message.content,
             "sources": sources,
             "distance": closest_distance,
         }
+        return finish_ask_response(response, request, timings, started) if request else response
     except Exception:
         logger.exception("RAG question processing failed")
-        return {
+        response = {
             "intent": "rag",
             "question": question,
             "route_reason": route_reason,
@@ -276,10 +354,13 @@ def answer_rag_question(question, route_reason, embedding_model, groq_client, en
             "distance": None,
             "error": True,
         }
+        return finish_ask_response(response, request, timings, started) if request else response
 
 
 @app.post("/ask")
 def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
+    started = time.perf_counter()
+    timings = new_timings()
     require_api_key(x_api_key, API_KEY)
     client_key = request.client.host if request.client else "unknown"
     allowed, retry_after = rate_limiter.check(client_key)
@@ -294,45 +375,65 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
     if not question:
         raise HTTPException(status_code=422, detail="Question must not be blank")
 
-    intent, route_reason = route_question(
-        question,
-        request.app.state.classifier_client,
-    )
+    stage_started = time.perf_counter()
+    try:
+        intent, route_reason = route_question(
+            question,
+            request.app.state.classifier_client,
+        )
+    finally:
+        timings["routing"] = round((time.perf_counter() - stage_started) * 1000, 3)
+    request.state.intent = intent
+    request.state.route_reason = route_reason
 
     if intent == "sql":
         try:
-            validated_query = generate_validated_sql(
-                request.app.state.groq_client,
-                MODEL_NAME,
-                build_sql_prompt(question),
-            )
+            stage_started = time.perf_counter()
+            try:
+                validated_query = generate_validated_sql(
+                    request.app.state.groq_client,
+                    MODEL_NAME,
+                    build_sql_prompt(question),
+                )
+            finally:
+                timings["sql_generation"] = round(
+                    (time.perf_counter() - stage_started) * 1000, 3
+                )
 
-            with sql_engine.begin() as conn:
-                conn.execute(text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}"))
-                result = conn.execute(text(validated_query.sql))
-                rows = result.fetchall()
+            stage_started = time.perf_counter()
+            try:
+                with sql_engine.begin() as conn:
+                    conn.execute(text(f"SET LOCAL statement_timeout = {SQL_STATEMENT_TIMEOUT_MS}"))
+                    result = conn.execute(text(validated_query.sql))
+                    rows = result.fetchall()
+                    column_names = list(result.keys())
+            finally:
+                timings["sql_execution"] = round(
+                    (time.perf_counter() - stage_started) * 1000, 3
+                )
 
-            column_names = list(result.keys())
             if len(rows) == 1 and len(column_names) == 1:
                 answer = rows[0][0]
             else:
                 answer = [dict(zip(column_names, row)) for row in rows]
 
-            return {
+            response = {
                 "intent": "sql",
                 "question": question,
                 "route_reason": route_reason,
                 "generated_sql": validated_query.sql,
                 "answer": answer
             }
+            return finish_ask_response(response, request, timings, started)
         except Exception as error:
             logger.exception("SQL question processing failed")
-            return {
+            response = {
                 "answer": "I couldn't process that as a database query — try rephrasing.",
                 "intent": "sql",
                 "route_reason": route_reason,
                 "error": True
             }
+            return finish_ask_response(response, request, timings, started)
 
     return answer_rag_question(
         question,
@@ -340,4 +441,7 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
         request.app.state.embedding_model,
         request.app.state.groq_client,
         rag_engine,
+        timings=timings,
+        request=request,
+        started=started,
     )

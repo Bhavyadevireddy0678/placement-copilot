@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from types import SimpleNamespace
+import time
 
 import ask_api
 
@@ -83,3 +84,21 @@ def test_rag_provider_failure_returns_safe_response(monkeypatch):
     assert response["error"] is True
     assert response["sources"] == []
     assert "provider unavailable" not in response["answer"]
+
+
+def test_finish_ask_response_adds_request_id_and_all_stage_timings():
+    request = SimpleNamespace(state=SimpleNamespace(request_id="request-123"))
+    timings = ask_api.new_timings()
+    timings["routing"] = 1.25
+
+    response = ask_api.finish_ask_response(
+        {"intent": "rag", "answer": "ok"},
+        request,
+        timings,
+        time.perf_counter(),
+    )
+
+    assert response["request_id"] == "request-123"
+    assert response["timings_ms"]["routing"] == 1.25
+    assert response["timings_ms"]["total"] >= 0
+    assert set(response["timings_ms"]) == set(ask_api.TIMING_STAGES)

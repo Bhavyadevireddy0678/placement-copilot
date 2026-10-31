@@ -337,6 +337,18 @@ def main():
         "sql_reference": sql_reference_timings,
         "live_http_total": [],
     }
+    api_stage_samples = {
+        stage: []
+        for stage in (
+            "routing",
+            "embedding",
+            "retrieval",
+            "sql_generation",
+            "sql_execution",
+            "llm",
+            "total",
+        )
+    }
     router_correct = 0
     router_scored = 0
     live_router_correct = 0
@@ -468,6 +480,11 @@ def main():
                 stage_samples["live_http_total"].append(live_total_ms)
                 record["live_response"] = live_response
                 record["live_total_ms"] = round(live_total_ms, 3)
+                api_timings = live_response.get("timings_ms") or {}
+                for stage, value in api_timings.items():
+                    if stage in api_stage_samples and isinstance(value, (int, float)):
+                        api_stage_samples[stage].append(float(value))
+                record["api_timings_ms"] = api_timings
                 live_intent = live_response.get("intent")
                 record["live_intent"] = live_intent
                 record["route_reason"] = live_response.get("route_reason")
@@ -656,10 +673,14 @@ def main():
         "offline_total_per_case": latency_summary(stage_samples["offline_total"]),
         "sql_reference_execution": latency_summary(stage_samples["sql_reference"]),
         "live_http_total": latency_summary(stage_samples["live_http_total"]),
-        "sql_generation": None,
-        "live_sql_execution_internal": None,
-        "llm_internal": None,
-        "note": "Internal database/LLM stage timings are not exposed by the current API; null means unmeasured, not zero.",
+        "api_routing": latency_summary(api_stage_samples["routing"]),
+        "api_embedding": latency_summary(api_stage_samples["embedding"]),
+        "api_retrieval": latency_summary(api_stage_samples["retrieval"]),
+        "api_sql_generation": latency_summary(api_stage_samples["sql_generation"]),
+        "api_sql_execution": latency_summary(api_stage_samples["sql_execution"]),
+        "api_llm": latency_summary(api_stage_samples["llm"]),
+        "api_total": latency_summary(api_stage_samples["total"]),
+        "note": "API stage timings exclude HTTP serialization; live_http_total includes full client-observed duration.",
     }
 
     report = {
