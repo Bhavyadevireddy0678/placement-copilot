@@ -75,6 +75,8 @@ body::before{
 .input-shell input{flex:1;padding:16px 18px;min-width:420px;max-width:1000px;border:1px solid var(--border);background:var(--paper);border-radius:10px}
 .input-shell button{border:none;background:transparent;font-size:1.2rem;padding:8px 12px;color:var(--muted);transition:transform .18s ease}
 .input-shell button:hover{transform:translateX(3px);color:var(--text)}
+.api-key-label{display:block;margin-top:12px;color:var(--muted);font-size:11px;letter-spacing:.1em}
+.api-key-input{width:min(360px,100%);margin-top:5px;padding:10px 12px;border:1px solid var(--border);background:var(--paper);border-radius:8px}
 .query-hint{margin-top:10px;color:var(--muted);font-size:14px}
 
 /* FINDINGS */

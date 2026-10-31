@@ -242,10 +242,14 @@ def retrieve(question, model, chunks, corpus_vectors):
 
 
 def post_question(api_url, question, timeout_seconds):
+    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("EVAL_API_KEY")
+    if api_key:
+        headers["X-API-Key"] = api_key
     request = urllib.request.Request(
         api_url.rstrip("/") + "/ask",
         data=json.dumps({"question": question}).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:

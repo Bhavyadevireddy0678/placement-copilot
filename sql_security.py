@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 
 import sqlglot
 from sqlglot import exp
@@ -6,15 +7,14 @@ from sqlglot.errors import ParseError
 
 MAX_SQL_ROWS = 100
 ALLOWED_TABLES = {"placements"}
-ALLOWED_COLUMNS = {
-    "student_id",
-    "student_name",
+NON_PII_COLUMNS = {
     "branch",
     "company",
     "stipend",
     "fte_package",
     "month_placed",
 }
+PII_COLUMNS = {"student_id", "student_name"}
 ALLOWED_FUNCTIONS = {"AVG", "COUNT", "MAX", "MIN", "SUM"}
 DANGEROUS_FUNCTIONS = {
     "COPY",
@@ -38,7 +38,12 @@ class SQLValidationError(ValueError):
     pass
 
 
-def validate_generated_sql(query: str) -> ValidatedQuery:
+def validate_generated_sql(query: str, allow_pii=None) -> ValidatedQuery:
+    if allow_pii is None:
+        allow_pii = os.getenv("SQL_ALLOW_PII_COLUMNS", "false").lower() in {
+            "1", "true", "yes", "on"
+        }
+    allowed_columns = NON_PII_COLUMNS | (PII_COLUMNS if allow_pii else set())
     cleaned_query = query.strip()
     if not cleaned_query:
         raise SQLValidationError("empty SQL")
@@ -58,6 +63,12 @@ def validate_generated_sql(query: str) -> ValidatedQuery:
         raise SQLValidationError("only SELECT statements are allowed")
     if not statement.expressions:
         raise SQLValidationError("SELECT must include at least one expression")
+    if not allow_pii and any(
+        isinstance(expression, exp.Star)
+        or (isinstance(expression, exp.Column) and expression.is_star)
+        for expression in statement.expressions
+    ):
+        raise SQLValidationError("SELECT * is disabled because it may expose PII")
 
     if statement.find(exp.Subquery):
         raise SQLValidationError("subqueries are not allowed")
@@ -69,7 +80,7 @@ def validate_generated_sql(query: str) -> ValidatedQuery:
     for column in statement.find_all(exp.Column):
         if column.table and column.table.lower() not in ALLOWED_TABLES:
             raise SQLValidationError("column table is not allowlisted")
-        if column.name != "*" and column.name.lower() not in ALLOWED_COLUMNS:
+        if column.name != "*" and column.name.lower() not in allowed_columns:
             raise SQLValidationError("column is not allowlisted")
 
     for function in statement.find_all(exp.Func):

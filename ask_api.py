@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from groq import Groq
@@ -11,6 +11,7 @@ from pgvector.psycopg2 import register_vector
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from api_security import SlidingWindowRateLimiter, require_api_key
 from sql_security import SQLValidationError, validate_generated_sql
 
 load_dotenv()
@@ -28,6 +29,13 @@ SQL_READONLY_DB_URL = os.getenv("SQL_READONLY_DB_URL")
 RAG_READONLY_DB_URL = os.getenv("RAG_READONLY_DB_URL") or SQL_READONLY_DB_URL
 SQL_STATEMENT_TIMEOUT_MS = int(os.getenv("SQL_STATEMENT_TIMEOUT_MS", "5000"))
 MODEL_NAME = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+API_KEY = os.getenv("API_KEY")
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+rate_limiter = SlidingWindowRateLimiter(
+    RATE_LIMIT_REQUESTS,
+    RATE_LIMIT_WINDOW_SECONDS,
+)
 
 rag_engine = (
     create_engine(
@@ -68,6 +76,8 @@ async def lifespan(application):
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY is not set")
+    if not API_KEY:
+        raise RuntimeError("API_KEY is not set")
     if rag_engine is None:
         raise RuntimeError("RAG_READONLY_DB_URL or SQL_READONLY_DB_URL is not set")
     if sql_engine is None:
@@ -156,7 +166,17 @@ def readiness(request: Request):
 
 
 @app.post("/ask")
-def ask(payload: AskRequest, request: Request):
+def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
+    require_api_key(x_api_key, API_KEY)
+    client_key = request.client.host if request.client else "unknown"
+    allowed, retry_after = rate_limiter.check(client_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=422, detail="Question must not be blank")

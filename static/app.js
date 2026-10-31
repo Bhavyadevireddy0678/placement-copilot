@@ -1,4 +1,5 @@
 const questionInput = document.getElementById('question');
+const apiKeyInput = document.getElementById('apiKey');
 const askBtn = document.getElementById('askBtn');
 const answerText = document.getElementById('answerText');
 const intentBadge = document.getElementById('intentBadge');
@@ -29,7 +30,10 @@ async function askQuestion() {
   try {
     const response = await fetch('/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKeyInput.value.trim()
+      },
       body: JSON.stringify({ question })
     });
     const data = await response.json();
