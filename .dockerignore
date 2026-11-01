@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+venv/
+__pycache__/
+.pytest_cache/
+.git/
+*.pyc
+eval_results_*.json
+loadtest_results_*.json
+synthetic_placements.csv
+documents/
