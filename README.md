@@ -85,4 +85,4 @@ GitHub Actions runs tests and offline evaluation on pushes and pull requests.
 - The bootstrap SQL is not a versioned migration framework. Backups, restore drills, TLS ingress, centralized logs/metrics/traces, and a real-data retention/deletion policy are deployment responsibilities not implemented here.
 - The full SQL allowlist is intentionally narrow. It can reject valid generated queries; the live evaluation includes rejected outputs and date wording mismatches.
 
-See [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) for design details and the interview walkthrough.
+See [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) for design details and the interview walkthrough, and [INTERVIEW_REPORT.md](INTERVIEW_REPORT.md) for measured hardening changes and interview questions.
