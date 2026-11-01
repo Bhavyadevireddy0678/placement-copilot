@@ -12,6 +12,42 @@ const findingTitle = document.getElementById('findingTitle');
 const methodText = document.getElementById('methodText');
 const sourceText = document.getElementById('sourceText');
 
+async function loadCompanySummaries() {
+  const companyGrid = document.getElementById('companyGrid');
+  if (!companyGrid) return;
+
+  try {
+    const response = await fetch('/company-summaries');
+    if (!response.ok) throw new Error('Summary request failed');
+    const data = await response.json();
+    const fragment = document.createDocumentFragment();
+
+    data.companies.forEach((company) => {
+      const item = document.createElement('article');
+      item.className = 'company-card';
+      const name = document.createElement('div');
+      name.className = 'company-name';
+      name.textContent = company.company;
+      const meta = document.createElement('div');
+      meta.className = 'company-meta';
+      const average = company.average_package == null
+        ? 'N/A'
+        : `${Number(company.average_package).toFixed(2)}L`;
+      meta.textContent = `Avg package ${average} · ${company.placement_count} placements`;
+      item.append(name, meta);
+      fragment.append(item);
+    });
+
+    companyGrid.replaceChildren(fragment);
+    document.getElementById('companyDataNote').textContent = data.sample_data
+      ? 'Sample placement data'
+      : 'Placement data';
+  } catch (error) {
+    companyGrid.replaceChildren(document.createTextNode('Company summaries unavailable.'));
+    console.error(error);
+  }
+}
+
 async function askQuestion() {
   const question = questionInput.value.trim();
 
@@ -95,6 +131,7 @@ async function askQuestion() {
 }
 
 askBtn.addEventListener('click', askQuestion);
+loadCompanySummaries();
 questionInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     askQuestion();

@@ -305,6 +305,28 @@ def readiness(request: Request):
     return {"status": "ready"}
 
 
+@app.get("/company-summaries")
+def company_summaries():
+    try:
+        with sql_engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    """
+                    SELECT company,
+                           COUNT(*) AS placement_count,
+                           ROUND(AVG(fte_package)::numeric, 2) AS average_package
+                    FROM placements
+                    GROUP BY company
+                    ORDER BY company
+                    """
+                )
+            ).mappings().all()
+        return {"sample_data": True, "companies": [dict(row) for row in rows]}
+    except Exception:
+        logger.exception("Company summaries query failed")
+        raise HTTPException(status_code=503, detail="Company summaries are unavailable")
+
+
 def answer_rag_question(
     question,
     route_reason,

@@ -1,0 +1,18 @@
+{
+  "source": "synthetic_placements.csv",
+  "rows": 600,
+  "expected_company_summaries": [
+    {"company": "Accenture", "placement_count": 49, "average_package": 5.95},
+    {"company": "Adobe", "placement_count": 57, "average_package": 19.79},
+    {"company": "Amazon", "placement_count": 49, "average_package": 16.97},
+    {"company": "Cognizant", "placement_count": 40, "average_package": 5.81},
+    {"company": "Deloitte", "placement_count": 37, "average_package": 6.26},
+    {"company": "Goldman Sachs", "placement_count": 52, "average_package": 21.61},
+    {"company": "Google", "placement_count": 51, "average_package": 29.25},
+    {"company": "LSEG", "placement_count": 52, "average_package": 14.06},
+    {"company": "Microsoft", "placement_count": 51, "average_package": 18.4},
+    {"company": "Salesforce", "placement_count": 52, "average_package": 15.5},
+    {"company": "TCS", "placement_count": 54, "average_package": 6.3},
+    {"company": "Wipro", "placement_count": 56, "average_package": 5.01}
+  ]
+}
