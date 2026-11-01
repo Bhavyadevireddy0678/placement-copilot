@@ -17,9 +17,6 @@ import pandas as pd
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
-from ask_api import classify_intent
-
-
 BASE_DIR = Path(__file__).resolve().parent
 EVAL_SET_PATH = BASE_DIR / "eval_set.json"
 DATA_PATH = BASE_DIR / "synthetic_placements.csv"
@@ -27,6 +24,41 @@ DOCUMENTS_DIR = BASE_DIR / "documents"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 TOP_K = 3
 DISTANCE_THRESHOLD = 0.7
+
+
+def classify_intent(question):
+    normalized_question = question.lower()
+    document_keywords = (
+        "cgpa",
+        "backlog",
+        "eligib",
+        "round",
+        "process",
+        "interview",
+    )
+    sql_keywords = (
+        "how many",
+        "count",
+        "average",
+        "avg",
+        "highest",
+        "lowest",
+        "maximum",
+        "minimum",
+        "top recruiter",
+        "total",
+        "package",
+        "salary",
+    )
+    document_match = any(word in normalized_question for word in document_keywords)
+    sql_match = any(word in normalized_question for word in sql_keywords)
+    if document_match and sql_match:
+        return "rag"
+    if document_match:
+        return "rag"
+    if sql_match:
+        return "sql"
+    return "rag"
 
 
 def load_eval_set():
