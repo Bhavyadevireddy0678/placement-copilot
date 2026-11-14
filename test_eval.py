@@ -1,4 +1,9 @@
-from eval import answer_is_correct, fact_is_present, run_cache_probe
+from eval import (
+    answer_is_correct,
+    fact_is_present,
+    run_cache_probe,
+    summarize_router_predictions,
+)
 
 
 def test_fact_matching_ignores_markdown_and_punctuation():
@@ -77,3 +82,17 @@ def test_cache_probe_submits_identical_rag_and_sql_requests(monkeypatch):
     assert requests[0][1] == requests[1][1]
     assert requests[2][1] == requests[3][1]
     assert probe["rag"]["cache_hits"] == [False, True]
+
+
+def test_router_accuracy_excludes_ambiguous_expectations():
+    records = [
+        {"expected_intent": "sql"},
+        {"expected_intent": "ambiguous"},
+        {"expected_intent": "rag"},
+    ]
+
+    assert summarize_router_predictions(records, ["sql", "sql", "sql"]) == {
+        "correct": 1,
+        "total": 2,
+        "accuracy": 0.5,
+    }

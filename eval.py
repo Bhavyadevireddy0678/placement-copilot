@@ -16,17 +16,28 @@ import numpy as np
 import pandas as pd
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from caches import CachedEmbeddingEncoder
+from intent_router import (
+    classify_intent as classify_by_embedding,
+    embed_router_examples,
+    keyword_intent,
+    llm_fallback,
+    load_router_examples,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 EVAL_SET_PATH = BASE_DIR / "eval_set.json"
+HELDOUT_SET_PATH = BASE_DIR / "eval_heldout.json"
+ROUTER_EXAMPLES_PATH = BASE_DIR / "router_examples.json"
 DATA_PATH = BASE_DIR / "synthetic_placements.csv"
 DOCUMENTS_DIR = BASE_DIR / "documents"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 TOP_K = 3
 DISTANCE_THRESHOLD = 0.7
+ROUTER_MARGIN_SWEEP = (0.02, 0.05, 0.08, 0.12)
 
 
-def classify_intent(question):
+def keyword_classify_intent(question):
     normalized_question = question.lower()
     document_keywords = (
         "cgpa",
@@ -75,6 +86,145 @@ def load_eval_set():
     if len({case["id"] for case in cases}) != len(cases):
         raise ValueError("Evaluation case IDs must be unique")
     return cases
+
+
+def load_heldout_set():
+    cases = json.loads(HELDOUT_SET_PATH.read_text(encoding="utf-8"))
+    if len(cases) != 15:
+        raise ValueError(f"Expected 15 held-out router cases, found {len(cases)}")
+    if len({case["id"] for case in cases}) != len(cases):
+        raise ValueError("Held-out evaluation case IDs must be unique")
+    for case in cases:
+        case["held_out"] = True
+        if case["expected_intent"] not in {"sql", "rag"}:
+            raise ValueError(f"Invalid held-out expected intent: {case['id']}")
+    return cases
+
+
+def router_case_records(cases, encoder, example_vectors):
+    records = []
+    for case in cases:
+        embedding_route, scores, margin, cache_hit = classify_by_embedding(
+            case["question"],
+            encoder,
+            example_vectors,
+        )
+        records.append(
+            {
+                **case,
+                "keyword_route": keyword_intent(case["question"]) or "rag",
+                "embedding_route": embedding_route,
+                "route_scores": scores,
+                "margin": margin,
+                "embedding_cache_hit": cache_hit,
+            }
+        )
+    return records
+
+
+def summarize_router_predictions(records, predicted_routes):
+    scored = [
+        (record, predicted)
+        for record, predicted in zip(records, predicted_routes)
+        if record["expected_intent"] in {"sql", "rag"}
+    ]
+    correct = sum(predicted == record["expected_intent"] for record, predicted in scored)
+    total = len(scored)
+    return {"correct": correct, "total": total, "accuracy": correct / total if total else None}
+
+
+def run_router_analysis(model, live_fallback=False):
+    tuning_cases = load_eval_set()
+    heldout_cases = load_heldout_set()
+    all_cases = tuning_cases + heldout_cases
+    examples = load_router_examples(ROUTER_EXAMPLES_PATH)
+    example_vectors = embed_router_examples(model, examples)
+    encoder = CachedEmbeddingEncoder(model, max_size=max(512, len(all_cases)))
+    records = router_case_records(all_cases, encoder, example_vectors)
+
+    classifier_client = None
+    if live_fallback:
+        from dotenv import load_dotenv
+        from groq import Groq
+
+        load_dotenv(BASE_DIR / ".env")
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY is required for live router fallback eval")
+        classifier_client = Groq(
+            api_key=api_key,
+            timeout=5,
+            max_retries=0,
+        )
+
+    needs_fallback = [
+        record for record in records
+        if record["margin"] < max(ROUTER_MARGIN_SWEEP)
+    ]
+    fallback_labels = {}
+    fallback_errors = {}
+    if classifier_client:
+        for record in needs_fallback:
+            label, error = llm_fallback(
+                record["question"],
+                classifier_client,
+                model_name=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
+                return_error=True,
+            )
+            fallback_labels[record["id"]] = label
+            fallback_errors[record["id"]] = error
+
+    splits = {
+        "tuning": [record for record in records if not record.get("held_out")],
+        "held_out": [record for record in records if record.get("held_out")],
+    }
+    split_results = {}
+    for split_name, split_records in splits.items():
+        keyword_predictions = [record["keyword_route"] for record in split_records]
+        embedding_predictions = [record["embedding_route"] for record in split_records]
+        threshold_rows = []
+        for threshold in ROUTER_MARGIN_SWEEP:
+            fallback_count = sum(record["margin"] < threshold for record in split_records)
+            hybrid_predictions = []
+            for record in split_records:
+                if record["margin"] >= threshold:
+                    hybrid_predictions.append(record["embedding_route"])
+                elif live_fallback:
+                    hybrid_predictions.append(fallback_labels.get(record["id"], "rag"))
+                else:
+                    hybrid_predictions.append(None)
+            threshold_rows.append(
+                {
+                    "threshold": threshold,
+                    "fallback_count": fallback_count,
+                    "fallback_rate": fallback_count / len(split_records),
+                    "embedding_plus_llm_fallback": (
+                        summarize_router_predictions(split_records, hybrid_predictions)
+                        if live_fallback else None
+                    ),
+                }
+            )
+        split_results[split_name] = {
+            "keyword_only": summarize_router_predictions(split_records, keyword_predictions),
+            "embedding_only": summarize_router_predictions(split_records, embedding_predictions),
+            "threshold_sweep": threshold_rows,
+            "cases": [
+                {
+                    **record,
+                    "llm_fallback_route": fallback_labels.get(record["id"]),
+                    "llm_fallback_error": fallback_errors.get(record["id"]),
+                }
+                for record in split_records
+            ],
+        }
+
+    return {
+        "embedding_model": os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL),
+        "example_counts": {route: len(examples[route]) for route in ("sql", "rag")},
+        "fallback_evaluated_live": bool(live_fallback),
+        "thresholds": list(ROUTER_MARGIN_SWEEP),
+        "splits": split_results,
+    }
 
 
 def normalize_text(value):
@@ -381,6 +531,21 @@ def main():
         action="store_true",
         help="Run only the repeated-request cache probe, without the 35-case suite.",
     )
+    parser.add_argument(
+        "--router-analysis-only",
+        action="store_true",
+        help="Compare keyword and embedding routers on tuning and held-out sets.",
+    )
+    parser.add_argument(
+        "--router-live-fallback",
+        action="store_true",
+        help="Call the real five-second Groq classifier for uncertain threshold cases.",
+    )
+    parser.add_argument(
+        "--router-threshold",
+        type=float,
+        default=float(os.getenv("ROUTER_MARGIN_THRESHOLD", "0.08")),
+    )
     args = parser.parse_args()
 
     if args.cache_probe_only:
@@ -391,13 +556,52 @@ def main():
             "evaluation_mode": "live_cache_probe",
             "cache_probe": run_cache_probe(args.api_url, args.http_timeout),
         }
-        output_path = BASE_DIR / f"eval_results_{args.name}.json"
+        output_dir = BASE_DIR / "results"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"eval_results_{args.name}.json"
         output_path.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
         print(json.dumps(report["cache_probe"], indent=2, ensure_ascii=False))
         print(f"Saved: {output_path.name}")
+        return
+
+    if args.router_analysis_only:
+        model_started = time.perf_counter()
+        model = SentenceTransformer(
+            os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+        )
+        model_load_ms = (time.perf_counter() - model_started) * 1000
+        analysis = run_router_analysis(model, live_fallback=args.router_live_fallback)
+        analysis["model_load_ms"] = round(model_load_ms, 3)
+        analysis["selected_threshold"] = args.router_threshold
+        report = {
+            "evaluation_name": args.name,
+            "evaluation_mode": "router_live_fallback" if args.router_live_fallback else "router_offline",
+            "tuning_case_count": len(load_eval_set()),
+            "held_out_case_count": len(load_heldout_set()),
+            "router_analysis": analysis,
+        }
+        output_dir = BASE_DIR / "results"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"eval_results_{args.name}.json"
+        output_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print("split | threshold | keyword acc | embedding acc | embed+LLM acc | fallback rate")
+        for split_name, split in analysis["splits"].items():
+            for row in split["threshold_sweep"]:
+                hybrid = row["embedding_plus_llm_fallback"]
+                print(
+                    f"{split_name} | {row['threshold']:.2f} | "
+                    f"{split['keyword_only']['accuracy']:.3f} | "
+                    f"{split['embedding_only']['accuracy']:.3f} | "
+                    f"{hybrid['accuracy'] if hybrid else 'NOT MEASURED'} | "
+                    f"{row['fallback_rate']:.3f}"
+                )
+        print(f"Saved: {output_path.relative_to(BASE_DIR)}")
         return
 
     cases = load_eval_set()
@@ -459,7 +663,7 @@ def main():
     for case in cases:
         total_started = time.perf_counter()
         router_started = time.perf_counter()
-        predicted_intent = classify_intent(case["question"])
+        predicted_intent = keyword_classify_intent(case["question"])
         router_ms = (time.perf_counter() - router_started) * 1000
         stage_samples["router"].append(router_ms)
 
@@ -797,7 +1001,9 @@ def main():
     if args.cache_probe and args.api_url:
         report["cache_probe"] = run_cache_probe(args.api_url, args.http_timeout)
 
-    output_path = BASE_DIR / f"eval_results_{args.name}.json"
+    output_dir = BASE_DIR / "results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"eval_results_{args.name}.json"
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     print(f"Evaluation: {args.name} ({report['evaluation_mode']})")

@@ -49,6 +49,8 @@ services:
       RAG_TOP_K: ${RAG_TOP_K:-3}
       RAG_DISTANCE_THRESHOLD: ${RAG_DISTANCE_THRESHOLD:-0.7}
       HYBRID_RETRIEVAL_ENABLED: ${HYBRID_RETRIEVAL_ENABLED:-false}
+      ROUTER_MARGIN_THRESHOLD: ${ROUTER_MARGIN_THRESHOLD:-0.08}
+      ROUTER_KEYWORD_ENABLED: ${ROUTER_KEYWORD_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

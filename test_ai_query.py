@@ -1,6 +1,6 @@
 import pytest
 
-from ai_query import execute_model_sql
+from scripts.ai_query import execute_model_sql
 from sql_security import SQLValidationError
 
 

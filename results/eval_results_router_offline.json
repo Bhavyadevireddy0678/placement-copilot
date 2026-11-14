@@ -1,0 +1,1144 @@
+{
+  "evaluation_name": "router_offline",
+  "evaluation_mode": "router_offline",
+  "tuning_case_count": 35,
+  "held_out_case_count": 15,
+  "router_analysis": {
+    "embedding_model": "all-MiniLM-L6-v2",
+    "example_counts": {
+      "sql": 20,
+      "rag": 20
+    },
+    "fallback_evaluated_live": false,
+    "thresholds": [
+      0.02,
+      0.05,
+      0.08,
+      0.12
+    ],
+    "splits": {
+      "tuning": {
+        "keyword_only": {
+          "correct": 30,
+          "total": 33,
+          "accuracy": 0.9090909090909091
+        },
+        "embedding_only": {
+          "correct": 30,
+          "total": 33,
+          "accuracy": 0.9090909090909091
+        },
+        "threshold_sweep": [
+          {
+            "threshold": 0.02,
+            "fallback_count": 2,
+            "fallback_rate": 0.05714285714285714,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.05,
+            "fallback_count": 3,
+            "fallback_rate": 0.08571428571428572,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.08,
+            "fallback_count": 8,
+            "fallback_rate": 0.22857142857142856,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.12,
+            "fallback_count": 15,
+            "fallback_rate": 0.42857142857142855,
+            "embedding_plus_llm_fallback": null
+          }
+        ],
+        "cases": [
+          {
+            "id": "sql_01",
+            "group": "sql",
+            "question": "How many placement rows are in the dataset?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(*) FROM placements",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 600
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4954889714717865,
+              "rag": 0.23623473942279816
+            },
+            "margin": 0.25925423204898834,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_02",
+            "group": "sql",
+            "question": "What is the average FTE package?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 14.045
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4628482758998871,
+              "rag": 0.272589772939682
+            },
+            "margin": 0.19025850296020508,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_03",
+            "group": "sql",
+            "question": "What is the highest package in the placement data?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT MAX(fte_package) FROM placements",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 39.46
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4676414728164673,
+              "rag": 0.28642985224723816
+            },
+            "margin": 0.18121162056922913,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_04",
+            "group": "sql",
+            "question": "How many students were placed at Google?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 51
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.43652716279029846,
+              "rag": 0.35284602642059326
+            },
+            "margin": 0.0836811363697052,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_05",
+            "group": "sql",
+            "question": "What was Amazon's average package?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements WHERE company = 'Amazon'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 16.9729
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.39783671498298645,
+              "rag": 0.18786586821079254
+            },
+            "margin": 0.2099708467721939,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_06",
+            "group": "sql",
+            "question": "How many placements came from each branch?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT branch, COUNT(*) AS total FROM placements GROUP BY branch ORDER BY branch",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": [
+                {
+                  "branch": "CSE",
+                  "total": 159
+                },
+                {
+                  "branch": "CSE-AI",
+                  "total": 144
+                },
+                {
+                  "branch": "ECE",
+                  "total": 149
+                },
+                {
+                  "branch": "IT",
+                  "total": 148
+                }
+              ]
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.493154376745224,
+              "rag": 0.4139869213104248
+            },
+            "margin": 0.0791674554347992,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_07",
+            "group": "sql",
+            "question": "What is Deloitte's maximum FTE package?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT MAX(fte_package) FROM placements WHERE company = 'Deloitte'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 7.99
+            },
+            "keyword_route": "sql",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.3414475917816162,
+              "rag": 0.3466321527957916
+            },
+            "margin": 0.005184561014175415,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_08",
+            "group": "sql",
+            "question": "How many students were placed in November?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(*) FROM placements WHERE month_placed = 'Nov'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 146
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.3597600758075714,
+              "rag": 0.2627965211868286
+            },
+            "margin": 0.0969635546207428,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_09",
+            "group": "sql",
+            "question": "How many different companies appear in the data?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(DISTINCT company) FROM placements",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 12
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.46229028701782227,
+              "rag": 0.2921624481678009
+            },
+            "margin": 0.17012783885002136,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_10",
+            "group": "sql",
+            "question": "Which company has the highest average FTE package?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT company FROM placements GROUP BY company ORDER BY AVG(fte_package) DESC LIMIT 1",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": "Google"
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4441019594669342,
+              "rag": 0.27195462584495544
+            },
+            "margin": 0.17214733362197876,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_11",
+            "group": "sql",
+            "question": "How many Amazon placements are in the table?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Amazon'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 49
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4348820745944977,
+              "rag": 0.23675058782100677
+            },
+            "margin": 0.1981314867734909,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "sql_12",
+            "group": "sql",
+            "question": "How many rows have a stipend value?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(stipend) FROM placements",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 306
+            },
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.5966383814811707,
+              "rag": 0.21585436165332794
+            },
+            "margin": 0.3807840198278427,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_01",
+            "group": "rag",
+            "question": "What minimum CGPA does Amazon require, and what is its active-backlog rule?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "amazon.txt",
+              "required_facts": [
+                "minimum CGPA of 7.0",
+                "must not have any active backlogs"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.26516470313072205,
+              "rag": 0.35586389899253845
+            },
+            "margin": 0.0906991958618164,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_02",
+            "group": "rag",
+            "question": "What are Microsoft's CGPA and backlog requirements?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "microsoft.txt",
+              "required_facts": [
+                "minimum CGPA of 7.0",
+                "must not have active backlogs"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.23856782913208008,
+              "rag": 0.4488484561443329
+            },
+            "margin": 0.2102806270122528,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_03",
+            "group": "rag",
+            "question": "For the TCS NQT pathway, how many active backlogs are allowed and when must they be cleared?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "tcs.txt",
+              "required_facts": [
+                "maximum of one active backlog",
+                "cleared before joining"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.22497202455997467,
+              "rag": 0.5040819644927979
+            },
+            "margin": 0.2791099399328232,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_04",
+            "group": "rag",
+            "question": "What assessments and interviews are in Accenture's recruitment process?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "accenture.txt",
+              "required_facts": [
+                "cognitive and technical assessment",
+                "communication assessment",
+                "technical/HR interview"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.305853009223938,
+              "rag": 0.6206203699111938
+            },
+            "margin": 0.31476736068725586,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_05",
+            "group": "rag",
+            "question": "What CGPA and backlog criteria does Adobe state?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "adobe.txt",
+              "required_facts": [
+                "minimum CGPA of 7.5",
+                "active or historical backlogs"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.25504806637763977,
+              "rag": 0.5507857799530029
+            },
+            "margin": 0.29573771357536316,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_06",
+            "group": "rag",
+            "question": "What is Cognizant GenC's minimum CGPA and active backlog limit?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "cognizant.txt",
+              "required_facts": [
+                "minimum CGPA of 6.0",
+                "not have more than one active backlog"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.2354973554611206,
+              "rag": 0.43999460339546204
+            },
+            "margin": 0.20449724793434143,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_07",
+            "group": "rag",
+            "question": "Summarize Deloitte's standing-backlog rule and its deadline for clearing backlogs.",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "deloitte.txt",
+              "required_facts": [
+                "not have more than one standing backlog",
+                "cleared before the offer letter is issued"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.3515210449695587,
+              "rag": 0.5565690994262695
+            },
+            "margin": 0.20504805445671082,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_08",
+            "group": "rag",
+            "question": "What CGPA and backlog rules are listed for Goldman Sachs?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "goldman_sachs.txt",
+              "required_facts": [
+                "minimum CGPA of 7.5",
+                "must not have any active backlogs"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.36312782764434814,
+              "rag": 0.49418091773986816
+            },
+            "margin": 0.13105309009552002,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_09",
+            "group": "rag",
+            "question": "What minimum CGPA does Google list for applying?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "google.txt",
+              "required_facts": [
+                "minimum CGPA of 8.0"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.3284359276294708,
+              "rag": 0.48286280035972595
+            },
+            "margin": 0.15442687273025513,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_10",
+            "group": "rag",
+            "question": "What stages does the Salesforce recruitment process include?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "salesforce.txt",
+              "required_facts": [
+                "online assessment",
+                "two technical interview rounds",
+                "one HR/values-fit round"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.35257279872894287,
+              "rag": 0.460226446390152
+            },
+            "margin": 0.1076536476612091,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_11",
+            "group": "rag",
+            "question": "How many active backlogs can a Wipro applicant have, and by when must they be cleared?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "wipro.txt",
+              "required_facts": [
+                "maximum of one active backlog",
+                "cleared before onboarding"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.3836379051208496,
+              "rag": 0.4808475971221924
+            },
+            "margin": 0.09720969200134277,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_12",
+            "group": "rag",
+            "question": "What CGPA and backlog rules are stated for LSEG?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "lseg.txt",
+              "required_facts": [
+                "minimum CGPA of 7.5",
+                "active or historical backlogs"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.22430481016635895,
+              "rag": 0.48542237281799316
+            },
+            "margin": 0.2611175626516342,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "rag_13",
+            "group": "rag",
+            "question": "How do TCS Digital and Prime CGPA cutoffs compare with the NQT minimum?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "tcs.txt",
+              "required_facts": [
+                "TCS NQT pathway",
+                "Digital and Prime generally require CGPA of 7.0 and above"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.20204605162143707,
+              "rag": 0.500276505947113
+            },
+            "margin": 0.29823045432567596,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_01",
+            "group": "hard",
+            "question": "Which employer hired the largest number of students?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT company FROM placements GROUP BY company ORDER BY COUNT(*) DESC, company LIMIT 1",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": "Adobe"
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.4646596908569336,
+              "rag": 0.2967578172683716
+            },
+            "margin": 0.167901873588562,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_02",
+            "group": "hard",
+            "question": "What was the mean FTE offer for Amazon?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT ROUND(AVG(fte_package), 4) FROM placements WHERE company = 'Amazon'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 16.9729
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.3779630959033966,
+              "rag": 0.2757616937160492
+            },
+            "margin": 0.10220140218734741,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_03",
+            "group": "hard",
+            "question": "How meny placements were with Google?",
+            "expected_intent": "sql",
+            "reference_sql": "SELECT COUNT(*) FROM placements WHERE company = 'Google'",
+            "expected_answer": {
+              "kind": "sql_result",
+              "value": 51
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.438627153635025,
+              "rag": 0.3894842565059662
+            },
+            "margin": 0.04914289712905884,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_04",
+            "group": "hard",
+            "question": "What academic cutoff applies to Google?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "google.txt",
+              "required_facts": [
+                "minimum CGPA of 8.0"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.38804566860198975,
+              "rag": 0.4635421335697174
+            },
+            "margin": 0.07549646496772766,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_05",
+            "group": "hard",
+            "question": "Do I need to clear backlogs for Deloite?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "rag_facts",
+              "source": "deloitte.txt",
+              "required_facts": [
+                "not have more than one standing backlog",
+                "cleared before the offer letter is issued"
+              ]
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.24509096145629883,
+              "rag": 0.5800432562828064
+            },
+            "margin": 0.33495229482650757,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_06",
+            "group": "hard",
+            "question": "How many placements are there, and what CGPA does Amazon require?",
+            "expected_intent": "ambiguous",
+            "reference_sql": "SELECT COUNT(*) FROM placements",
+            "expected_answer": {
+              "kind": "mixed_facts",
+              "required_facts": [
+                "minimum CGPA of 7.0"
+              ],
+              "source": "amazon.txt",
+              "required_sql_value": 600
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.3954388201236725,
+              "rag": 0.3771331012248993
+            },
+            "margin": 0.018305718898773193,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_07",
+            "group": "hard",
+            "question": "Which company has the highest package, and what technical interview rounds does Google use?",
+            "expected_intent": "ambiguous",
+            "reference_sql": "SELECT MAX(fte_package) FROM placements",
+            "expected_answer": {
+              "kind": "mixed_facts",
+              "required_facts": [
+                "two to three technical interview rounds",
+                "final HR/googleyness round"
+              ],
+              "source": "google.txt",
+              "required_sql_value": 39.46
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.38638439774513245,
+              "rag": 0.46728602051734924
+            },
+            "margin": 0.0809016227722168,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_08",
+            "group": "hard",
+            "question": "Who won the 2024 World Series?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "abstain"
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.11731386929750443,
+              "rag": 0.047069985419511795
+            },
+            "margin": 0.07024388387799263,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_09",
+            "group": "hard",
+            "question": "What is the weather in Seattle today?",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "abstain"
+            },
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.14332808554172516,
+              "rag": 0.08058007806539536
+            },
+            "margin": 0.0627480074763298,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "hard_10",
+            "group": "hard",
+            "question": "Explain how to build a quantum computer.",
+            "expected_intent": "rag",
+            "expected_answer": {
+              "kind": "abstain"
+            },
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.1309671252965927,
+              "rag": 0.18807607889175415
+            },
+            "margin": 0.05710895359516144,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          }
+        ]
+      },
+      "held_out": {
+        "keyword_only": {
+          "correct": 10,
+          "total": 15,
+          "accuracy": 0.6666666666666666
+        },
+        "embedding_only": {
+          "correct": 15,
+          "total": 15,
+          "accuracy": 1.0
+        },
+        "threshold_sweep": [
+          {
+            "threshold": 0.02,
+            "fallback_count": 0,
+            "fallback_rate": 0.0,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.05,
+            "fallback_count": 1,
+            "fallback_rate": 0.06666666666666667,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.08,
+            "fallback_count": 1,
+            "fallback_rate": 0.06666666666666667,
+            "embedding_plus_llm_fallback": null
+          },
+          {
+            "threshold": 0.12,
+            "fallback_count": 3,
+            "fallback_rate": 0.2,
+            "embedding_plus_llm_fallback": null
+          }
+        ],
+        "cases": [
+          {
+            "id": "held_sql_01",
+            "question": "Tally the number of placement entries.",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.5323315262794495,
+              "rag": 0.1981937736272812
+            },
+            "margin": 0.3341377526521683,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_02",
+            "question": "Which recruiter has the greatest mean offer?",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.42798030376434326,
+              "rag": 0.29748454689979553
+            },
+            "margin": 0.13049575686454773,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_03",
+            "question": "Show monthly hiring totals, please.",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.5485838651657104,
+              "rag": 0.274967759847641
+            },
+            "margin": 0.27361610531806946,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_04",
+            "question": "Among IT graduates, what is the mean FTE value?",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.44716739654541016,
+              "rag": 0.3998844623565674
+            },
+            "margin": 0.04728293418884277,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_05",
+            "question": "How many records contain a blank stipend?",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.6100877523422241,
+              "rag": 0.23788131773471832
+            },
+            "margin": 0.3722064346075058,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_06",
+            "question": "Rank the branches by number of offers, largest first.",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.46369668841362,
+              "rag": 0.35032129287719727
+            },
+            "margin": 0.11337539553642273,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_07",
+            "question": "Amazon's highest recorded package?",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "sql",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.41881808638572693,
+              "rag": 0.1976519376039505
+            },
+            "margin": 0.22116614878177643,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_sql_08",
+            "question": "What was the median offer amount across all employers?",
+            "expected_intent": "sql",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "sql",
+            "route_scores": {
+              "sql": 0.527959942817688,
+              "rag": 0.3050762116909027
+            },
+            "margin": 0.22288373112678528,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_01",
+            "question": "At what score can someone apply to Accenture?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.27286645770072937,
+              "rag": 0.5744633078575134
+            },
+            "margin": 0.30159685015678406,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_02",
+            "question": "Tell me the Adobe arrears rule at application time.",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.19125616550445557,
+              "rag": 0.5073638558387756
+            },
+            "margin": 0.31610769033432007,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_03",
+            "question": "What happens after the Wipro Elite NTH coding test?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.28460848331451416,
+              "rag": 0.39571282267570496
+            },
+            "margin": 0.1111043393611908,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_04",
+            "question": "Does Google set a different bar for STEP interns?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.2172810435295105,
+              "rag": 0.351949542760849
+            },
+            "margin": 0.1346684992313385,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_05",
+            "question": "What kind of questions feature in Goldman Sachs screening?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.3137087821960449,
+              "rag": 0.45208263397216797
+            },
+            "margin": 0.13837385177612305,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_06",
+            "question": "Could you explain the Deloitte offer-letter backlog deadline?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.2831748425960541,
+              "rag": 0.4566434919834137
+            },
+            "margin": 0.17346864938735962,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          },
+          {
+            "id": "held_rag_07",
+            "question": "How does the TCS Ninja track differ in its stated cutoff?",
+            "expected_intent": "rag",
+            "held_out": true,
+            "keyword_route": "rag",
+            "embedding_route": "rag",
+            "route_scores": {
+              "sql": 0.18412218987941742,
+              "rag": 0.30876773595809937
+            },
+            "margin": 0.12464554607868195,
+            "embedding_cache_hit": false,
+            "llm_fallback_route": null,
+            "llm_fallback_error": null
+          }
+        ]
+      }
+    },
+    "model_load_ms": 3785.302,
+    "selected_threshold": 0.05
+  }
+}

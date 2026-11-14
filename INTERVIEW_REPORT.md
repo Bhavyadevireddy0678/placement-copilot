@@ -7,67 +7,67 @@ This report separates source changes, live measurements, retrieval-only measurem
 ## 1. Per-Step Summary and Commits
 
 ### Step 0: Live Baseline
-Commit: `40ca233a` (`0: capture live baseline and phase A evaluation`). Files include `eval_set.json`, `eval.py`, `eval_results_baseline.json`, `eval_results_baseline_live.json`, `ingest.py`, `scripts/groq_test.py`, `test_eval.py`, and `test_sql_security.py`.
+Commit: `40ca233a` (`0: capture live baseline and phase A evaluation`). Files include `eval_set.json`, `eval.py`, `results/eval_results_baseline.json`, `results/eval_results_baseline_live.json`, `ingest.py`, `scripts/groq_test.py`, `test_eval.py`, and `test_sql_security.py`.
 
 What: Added the 35-case ground-truth set, offline/live evaluator, saved baseline reports, made the secret-dependent Groq smoke script import-safe, and fixed the psycopg2 URL scheme discovered while loading data. Why: This established a factual baseline and made default pytest collection possible before later behavior changes. Tradeoff: Live evaluation consumed provider tokens and was vulnerable to model variance; the first commit also captured the pre-existing uncommitted project files because they had no prior Git commit.
 
 ### Step 1: SQL and API Security
-Commit: `1d80fce2` (`1: secure SQL execution and ask endpoint`). Files include `api_security.py`, `ai_query.py`, `ask_api.py`, `sql_security.py`, `static/app.js`, `static/index.html`, `static/styles.css`, and the API/security tests.
+Commit: `1d80fce2` (`1: secure SQL execution and ask endpoint`). Files include `api_security.py`, `scripts/ai_query.py`, `ask_api.py`, `sql_security.py`, `static/app.js`, `static/index.html`, `static/styles.css`, and the API/security tests.
 
 What: Added constant-time API-key comparison, a per-process sliding-window IP limiter, PII column denial including `SELECT *`, and routed the auxiliary SQL executor through validation and the read-only URL. Why: The API accepts natural language and SQL is model-generated, while placement rows include identifiers. Tradeoff: The browser needs a shared secret entered by the operator, and the in-memory limiter does not coordinate across workers or replicas.
 
 ### Step 2a: Corpus Cleanup and Idempotent Ingestion
-Commit: `7c40ac65` (`2a: clean document corpus and measure reingestion`). Files: `documents/amazon.txt`, `eval_results_after_corpus_cleanup.json`; idempotent staging/replacement is implemented in `ingest.py` from step 0.
+Commit: `7c40ac65` (`2a: clean document corpus and measure reingestion`). Files: `documents/amazon.txt`, `results/eval_results_after_corpus_cleanup.json`; idempotent staging/replacement is implemented in `ingest.py` from step 0.
 
 What: Removed the literal `cat documents/amazon.txt` artifact and scanned all 12 company files for junk markers. Why: Ingestion indexes file contents literally, so shell residue would become retrieval context. Tradeoff: Ingestion remains a full-corpus replacement rather than an incremental content-hash pipeline; two runs both produced 22 chunks with identical per-source counts.
 
 ### Step 2b: Hybrid Router
-Commit: `5f9344f7` (`2b: add measured LLM fallback intent routing`). Files: `ask_api.py`, `eval.py`, `test_router.py`, `eval_results_after_router.json`.
+Commit: `5f9344f7` (`2b: add measured LLM fallback intent routing`). Files: `ask_api.py`, `eval.py`, `test_router.py`, `results/eval_results_after_router.json`.
 
 What: Kept keyword matches as the fast path, sent unmatched/conflicting cases to a strict `sql`/`rag` classifier with a five-second timeout, added `route_reason`, and defaulted classifier failures to RAG. Why: Keyword-only routing missed paraphrases and typos. Tradeoff: The fallback adds provider latency/token use and remained imperfect: the only verified correct flip among the designated hard SQL cases was `hard_02`; `hard_01` and typo case `hard_03` still routed to RAG, and mixed case `hard_07` chose SQL.
 
 ### Step 2c: SQL Prompt and Retry
-Commit: `71b56543` (`2c: add few-shot SQL generation and one validator retry`). Files: `sql_generation.py`, `ask_api.py`, `test_sql_generation.py`, `eval_results_after_sql_prompt.json`.
+Commit: `71b56543` (`2c: add few-shot SQL generation and one validator retry`). Files: `sql_generation.py`, `ask_api.py`, `test_sql_generation.py`, `results/eval_results_after_sql_prompt.json`.
 
 What: Added six schema-grounded SQL examples and exactly one validator-feedback retry for rejected SQL. Why: Examples demonstrate the supported query shape and rejection feedback lets the model correct parse/allowlist errors once. Tradeoff: More prompt tokens and an extra possible provider call; SQL accuracy rose from 10/15 in the preceding live run to 12/15 in this run, but this was a small, nondeterministic sample and not proof of causal improvement.
 
 ### Step 2d: Hybrid Retrieval Benchmark
-Commit: `b5b7cc89` (`2d: benchmark hybrid retrieval and retain vector winner`). Files: `retrieval.py`, `retrieval_sweep.py`, `db/init.sql`, `ingest.py`, `ask_api.py`, `test_retrieval.py`, `eval_results_retrieval_sweep.json`, `eval_results_after_retrieval.json`.
+Commit: `b5b7cc89` (`2d: benchmark hybrid retrieval and retain vector winner`). Files: `retrieval.py`, `retrieval_sweep.py`, `db/init.sql`, `ingest.py`, `ask_api.py`, `test_retrieval.py`, `results/eval_results_retrieval_sweep.json`, `results/eval_results_after_retrieval.json`.
 
 What: Added a stored English `tsvector`, GIN index, optional full-text/vector reciprocal-rank fusion, and PostgreSQL-backed sweep over top-k and thresholds. Why: This provides a measured alternative to vector-only retrieval without silently replacing the baseline. Tradeoff: Hybrid mode has extra index/write/query work; on 22 chunks it matched vector-only at 17/17 source recall, 17/17 fact coverage, and 3/3 abstention accuracy, while measured p50/p95 was 2.015/4.258 ms versus 0.929/2.581 ms for vector-only. The selected default remains vector-only, top-k 3, threshold 0.7; no cross-encoder was added because the sweep showed no factual-recall headroom.
 
 ### Step 3a: RAG Failure Containment
-Commit: `4fb239e8` (`3a: contain RAG failures and bound retrieval queries`). Files: `ask_api.py`, `test_rag_reliability.py`, `eval_results_after_rag_reliability.json`.
+Commit: `4fb239e8` (`3a: contain RAG failures and bound retrieval queries`). Files: `ask_api.py`, `test_rag_reliability.py`, `results/eval_results_after_rag_reliability.json`.
 
 What: Wrapped RAG embedding/retrieval/provider work, logged server-side failures, returned a safe degraded-compatible JSON response, and set PostgreSQL statement timeout for retrieval. Why: A DB/provider exception previously escaped the RAG route and could become HTTP 500. Tradeoff: Users receive a generic retry message rather than the underlying cause; the exact cause remains in server logs.
 
 ### Step 3b: Request Telemetry
-Commit: `109fab1c` (`3b: add request IDs and stage timing telemetry`). Files: `ask_api.py`, `eval.py`, `test_observability.py`, `test_rag_reliability.py`, `eval_results_after_observability.json`.
+Commit: `109fab1c` (`3b: add request IDs and stage timing telemetry`). Files: `ask_api.py`, `eval.py`, `test_observability.py`, `test_rag_reliability.py`, `results/eval_results_after_observability.json`.
 
 What: Added request IDs, a compact structured JSON HTTP log, and `timings_ms` fields for routing, embedding, retrieval, SQL generation, SQL execution, LLM, and total. Why: The previous live measurements could not attribute latency to internal stages. Tradeoff: Timing and logging add small per-request overhead and response metadata; one full live snapshot measured total p50/p95 820/5,682 ms, with LLM-stage p50/p95 919/7,195 ms.
 
 ### Step 3c: Bounded Caches
-Commit: `691e74d0` (`3c: cache repeated embeddings and SQL results`). Files: `caches.py`, `ask_api.py`, `eval.py`, `.env.example`, `test_caches.py`, `test_eval.py`, `eval_results_cache_probe.json`.
+Commit: `691e74d0` (`3c: cache repeated embeddings and SQL results`). Files: `caches.py`, `ask_api.py`, `eval.py`, `.env.example`, `test_caches.py`, `test_eval.py`, `results/eval_results_cache_probe.json`.
 
 What: Added an exact-question embedding LRU and a bounded TTL cache for validated SQL results, with configurable sizes and hit flags. Why: Repeated questions can avoid embedding and repeated execution of identical validated SQL. Tradeoff: Results can be stale for up to the TTL, cache state is per process, and LLM generation is not cached; the 2-request SQL probe showed execution 14.494 to 0.005 ms but total 444.243 to 619.552 ms because SQL-generation latency varied.
 
 ### Step 3d: Provider Resilience
-Commit: `2dc1dac5` (`3d: add provider retries and circuit breaker`). Files: `resilience.py`, `ask_api.py`, `sql_generation.py`, `.env.example`, `test_resilience.py`, `eval_results_after_resilience_offline.json`.
+Commit: `2dc1dac5` (`3d: add provider retries and circuit breaker`). Files: `resilience.py`, `ask_api.py`, `sql_generation.py`, `.env.example`, `test_resilience.py`, `results/eval_results_after_resilience_offline.json`.
 
 What: Added transient-only retries with exponential backoff and jitter, a shared circuit breaker with half-open recovery, and explicit degraded responses for SQL/RAG provider exhaustion. Why: Logs during the live work recorded Groq HTTP 429 token-per-minute failures and provider timeouts. Tradeoff: Retrying adds latency and consumes provider quota; the classifier still defaults to RAG on provider failure as required. Provider failure behavior was deterministically tested; post-change full live answer accuracy was not measured due provider TPM limits.
 
 ### Step 3e: Health and Sync Handler Semantics
-Commit: `9bb12071` (`3e: make health checks dependency aware`). Files: `ask_api.py`, `test_health_async.py`, `eval_results_after_health_offline.json`.
+Commit: `9bb12071` (`3e: make health checks dependency aware`). Files: `ask_api.py`, `test_health_async.py`, `results/eval_results_after_health_offline.json`.
 
 What: `/health` now verifies model initialization and connectivity to both DB engines; `/ask` and `/health` are tested as synchronous FastAPI handlers. Why: A process-alive response alone does not establish that the API can serve model/DB work, and blocking operations must not execute directly as async endpoint bodies. Tradeoff: Health probes now perform two DB pings; measured p95 rose from 6.536/4.190/7.364 ms to 26.237/25.298/41.191 ms at 1/10/25 clients.
 
 ### Step 3f: Concurrent Load Measurement
-Commit: `c5213226` (`3f: add concurrent load and health benchmarks`). Files: `loadtest.py`, `test_loadtest.py`, four `loadtest_results_*.json` artifacts, and `eval_results_after_loadtest_offline.json`.
+Commit: `c5213226` (`3f: add concurrent load and health benchmarks`). Files: `loadtest.py`, `test_loadtest.py`, four `results/loadtest_results_*.json` artifacts, and `results/eval_results_after_loadtest_offline.json`.
 
 What: Added a concurrent HTTP runner reporting throughput, p50/p95, status counts, and degraded responses at 1, 10, and 25 clients. Why: The API’s synchronous model/DB calls and local caches needed measured concurrency behavior. Tradeoff: To avoid Groq TPM throttling, `/ask` load tests used a zero distance threshold so they measured routing/embedding/retrieval and deliberately skipped answer generation; they do not represent full-answer production throughput.
 
 ### Step 4a: Placement Indexes
-Commit: `7c11e09c` (`4a: index placement company and branch filters`). Files: `db/init.sql`, `ingest.py`, `eval_results_indexes.json`.
+Commit: `7c11e09c` (`4a: index placement company and branch filters`). Files: `db/init.sql`, `ingest.py`, `results/eval_results_indexes.json`.
 
 What: Added B-tree indexes on `placements(company)` and `placements(branch)` to bootstrap and existing-database ingestion paths. Why: These columns are used in common exact filters. Tradeoff: The 600-row table is too small to prove general benefit; Google count switched from seq scan at 0.076 ms to bitmap index/heap scan at 0.042 ms, while branch count remained seq scan at 0.054 ms.
 
@@ -77,22 +77,22 @@ Commit: `ffb82e95` (`4b: containerize API and add health checks`). Files: `Docke
 What: Added a Python API image, Compose API service, healthy-DB dependency, loopback port mapping, and HTTP container healthcheck. Why: It provides a single Compose command for database and API startup without copying `.env`, local venv, docs, or CSV into the API image. Tradeoff: The image includes Sentence-Transformers/PyTorch and downloads the embedding model at startup; the build could not be completed because Docker Desktop’s daemon disconnected mid-build, so image execution is unverified.
 
 ### Step 4c: CI
-Commit: `c021c900` (`4c: add CI tests and offline evaluation`). Files: `.github/workflows/ci.yml`, `eval.py`, `test_eval_router_parity.py`, `eval_results_after_ci_offline.json`.
+Commit: `c021c900` (`4c: add CI tests and offline evaluation`). Files: `.github/workflows/ci.yml`, `eval.py`, `test_eval_router_parity.py`, `results/eval_results_after_ci_offline.json`.
 
 What: Added GitHub Actions for tests and offline evaluation, and decoupled offline router scoring from DB-dependent API module initialization. Why: CI should validate code and fixtures without Groq credentials or a PostgreSQL service. Tradeoff: The evaluator contains a keyword-router copy; a parity test compares it with `ask_api.classify_intent()` over the full fixture and additional probes.
 
 ### Step 4d: Company Summary UI
-Commit: `ae9a4014` (`4d: fetch and label sample company summaries`). Files: `ask_api.py`, `static/index.html`, `static/app.js`, `static/styles.css`, `test_company_summaries.py`, `eval_results_company_summaries.json`.
+Commit: `ae9a4014` (`4d: fetch and label sample company summaries`). Files: `ask_api.py`, `static/index.html`, `static/app.js`, `static/styles.css`, `test_company_summaries.py`, `results/eval_results_company_summaries.json`.
 
 What: Replaced static company counts/package values with `/company-summaries`, which aggregates read-only placement data, and labeled the display “Sample placement data.” Why: The old hard-coded values did not match the CSV. Tradeoff: The new endpoint depends on database availability and still displays generated sample records, not verified employer outcomes.
 
 ### Step 4e: README and Measured Results
-Commit: `3f782526` (`4e: document measured results and actual limitations`). Files: `README.md`, `eval_results_readme_ci_check.json`.
+Commit: `3f782526` (`4e: document measured results and actual limitations`). Files: `README.md`, `results/eval_results_readme_ci_check.json`.
 
 What: Updated architecture, run instructions, measurements, and verified current limitations. Why: The previous README claimed authentication, rate limiting, tests, and pinning were missing after those features had been added. Tradeoff: The README explicitly separates full live answers, retrieval-only sweeps, and retrieval-only load tests rather than presenting them as comparable measurements.
 
 ### Step 4f: Dependency Pins
-Commit: `dfb7c4e4` (`4f: pin direct dependencies and final offline check`). Files: `requirements.txt`, `eval_results_final_offline.json`.
+Commit: `dfb7c4e4` (`4f: pin direct dependencies and final offline check`). Files: `requirements.txt`, `results/eval_results_final_offline.json`.
 
 What: Pinned all 14 direct runtime/eval/test requirements to exact versions from the configured environment. Why: Reproducible installs make CI and local results less dependent on package releases. Tradeoff: Upgrades now require deliberate pin changes and compatibility checks; transitive dependencies are not locked by a generated lockfile.
 

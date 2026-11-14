@@ -145,7 +145,9 @@ def main():
         "question": args.question if args.path == "/ask" else None,
         "results": results,
     }
-    output_path = BASE_DIR / f"loadtest_results_{args.name}.json"
+    output_dir = BASE_DIR / "results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"loadtest_results_{args.name}.json"
     output_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
     print("clients | requests | throughput req/s | p50 ms | p95 ms | degraded | statuses")

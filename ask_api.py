@@ -19,6 +19,13 @@ from caches import CachedEmbeddingEncoder, TTLCache
 from sql_generation import build_sql_prompt, generate_validated_sql
 from retrieval import retrieve_chunks
 from resilience import CircuitBreaker, LLMResilience, LLMUnavailableError, resilient_chat_completion
+from intent_router import (
+    classify_intent,
+    embed_router_examples,
+    keyword_intent,
+    llm_fallback,
+    load_router_examples,
+)
 
 load_dotenv()
 
@@ -49,6 +56,11 @@ LLM_CIRCUIT_FAILURE_THRESHOLD = int(os.getenv("LLM_CIRCUIT_FAILURE_THRESHOLD", "
 LLM_CIRCUIT_RESET_SECONDS = float(os.getenv("LLM_CIRCUIT_RESET_SECONDS", "30"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
 RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "0.7"))
+ROUTER_MARGIN_THRESHOLD = float(os.getenv("ROUTER_MARGIN_THRESHOLD", "0.08"))
+ROUTER_KEYWORD_ENABLED = os.getenv("ROUTER_KEYWORD_ENABLED", "false").lower() in {
+    "1", "true", "yes", "on"
+}
+ROUTER_EXAMPLES_PATH = BASE_DIR / "router_examples.json"
 HYBRID_RETRIEVAL_ENABLED = os.getenv("HYBRID_RETRIEVAL_ENABLED", "false").lower() in {
     "1", "true", "yes", "on"
 }
@@ -113,6 +125,11 @@ async def lifespan(application):
     application.state.embedding_encoder = CachedEmbeddingEncoder(
         embedding_model,
         EMBEDDING_CACHE_SIZE,
+    )
+    application.state.router_examples = load_router_examples(ROUTER_EXAMPLES_PATH)
+    application.state.router_example_vectors = embed_router_examples(
+        embedding_model,
+        application.state.router_examples,
     )
     application.state.groq_client = Groq(
         api_key=api_key,
@@ -202,82 +219,40 @@ def finish_ask_response(response, request, timings, started):
     return response
 
 
-def _keyword_intent(question):
-    question = question.lower()
+def route_question(
+    question,
+    classifier_client,
+    resilience=None,
+    embedding_encoder=None,
+    router_example_vectors=None,
+    margin_threshold=None,
+    keyword_enabled=None,
+):
+    if keyword_enabled is None:
+        keyword_enabled = ROUTER_KEYWORD_ENABLED
+    if margin_threshold is None:
+        margin_threshold = ROUTER_MARGIN_THRESHOLD
+    if keyword_enabled:
+        keyword_route = keyword_intent(question)
+        if keyword_route is not None:
+            return keyword_route, "keyword"
 
-    document_keywords = [
-        "cgpa",
-        "backlog",
-        "eligib",
-        "round",
-        "process",
-        "interview"
-    ]
-
-    sql_keywords = [
-        "how many",
-        "count",
-        "average",
-        "avg",
-        "highest",
-        "lowest",
-        "maximum",
-        "minimum",
-        "top recruiter",
-        "total",
-        "package",
-        "salary"
-    ]
-
-    document_match = any(keyword in question for keyword in document_keywords)
-    sql_match = any(keyword in question for keyword in sql_keywords)
-    if document_match and sql_match:
-        return None, "conflicting_keywords"
-    if document_match:
-        return "rag", "keyword_rag"
-    if sql_match:
-        return "sql", "keyword_sql"
-    return None, "unmatched"
-
-
-def classify_intent(question):
-    intent, _ = _keyword_intent(question)
-    return intent or "rag"
-
-
-def route_question(question, classifier_client, resilience=None):
-    intent, route_reason = _keyword_intent(question)
-    if intent is not None:
-        return intent, route_reason
-    if classifier_client is None:
-        return "rag", "default_rag_classifier_unavailable"
-
-    prompt = f"""
-    Classify the user's primary question as exactly one token: sql or rag.
-    Return no explanation, punctuation, or other text.
-    Use sql for exact counts, sums, averages, rankings, or filters over placement records.
-    Use rag for eligibility rules, company processes, interviews, and document facts.
-    If the question is mixed or unclear, choose the dominant information source.
-
-    Question:
-    {question}
-    """
-    try:
-        response = resilient_chat_completion(
-            classifier_client,
-            resilience,
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
+    if embedding_encoder is not None and router_example_vectors is not None:
+        embedding_route, _scores, margin, _cache_hit = classify_intent(
+            question,
+            embedding_encoder,
+            router_example_vectors,
         )
-        label = (response.choices[0].message.content or "").strip().lower()
-        if label not in {"sql", "rag"}:
-            return "rag", "default_rag_invalid_classifier_output"
-        suffix = "conflict" if route_reason == "conflicting_keywords" else "unmatched"
-        return label, f"llm_fallback_{suffix}_{label}"
-    except Exception:
-        logger.exception("Intent classifier failed; defaulting to RAG")
-        return "rag", "default_rag_classifier_error"
+        if embedding_route is not None and margin >= margin_threshold:
+            return embedding_route, "embedding"
+
+    label = llm_fallback(
+        question,
+        classifier_client,
+        resilience=resilience,
+        model_name=MODEL_NAME,
+    )
+    return label, "llm_fallback"
 
 
 @app.get("/")
@@ -466,6 +441,8 @@ def ask(payload: AskRequest, request: Request, x_api_key=Header(default=None)):
             question,
             request.app.state.classifier_client,
             request.app.state.classifier_resilience,
+            request.app.state.embedding_encoder,
+            request.app.state.router_example_vectors,
         )
     finally:
         timings["routing"] = round((time.perf_counter() - stage_started) * 1000, 3)

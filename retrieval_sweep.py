@@ -168,7 +168,9 @@ def main():
             "abstention_accuracy": best["abstention_accuracy"],
         },
     }
-    output_path = BASE_DIR / "eval_results_retrieval_sweep.json"
+    output_dir = BASE_DIR / "results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "eval_results_retrieval_sweep.json"
     output_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
     print("Vector-only vs hybrid at top_k=3, threshold=0.7")
