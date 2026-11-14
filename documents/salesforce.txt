@@ -1,0 +1,14 @@
+Salesforce Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 7.0 to apply for Salesforce.
+
+Students must not have any active backlogs at the time of the recruitment process.
+
+Recruitment process consists of an online assessment (coding + aptitude), followed by two technical interview rounds and one HR/values-fit round.
+
+Salesforce primarily recruits for Associate Software Engineer roles from CSE, CSE-AI, and IT branches.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria may vary depending on the specific team (Platform vs Product) within Salesforce.

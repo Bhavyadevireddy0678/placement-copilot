@@ -1,0 +1,1048 @@
+"""Offline and optional live evaluation for Placement Copilot."""
+
+import argparse
+import json
+import math
+import os
+import re
+import sqlite3
+import statistics
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
+from caches import CachedEmbeddingEncoder
+from intent_router import (
+    classify_intent as classify_by_embedding,
+    embed_router_examples,
+    keyword_intent,
+    llm_fallback,
+    load_router_examples,
+)
+
+BASE_DIR = Path(__file__).resolve().parent
+EVAL_SET_PATH = BASE_DIR / "eval_set.json"
+HELDOUT_SET_PATH = BASE_DIR / "eval_heldout.json"
+ROUTER_EXAMPLES_PATH = BASE_DIR / "router_examples.json"
+DATA_PATH = BASE_DIR / "synthetic_placements.csv"
+DOCUMENTS_DIR = BASE_DIR / "documents"
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+TOP_K = 3
+DISTANCE_THRESHOLD = 0.7
+ROUTER_MARGIN_SWEEP = (0.02, 0.05, 0.08, 0.12)
+
+
+def keyword_classify_intent(question):
+    normalized_question = question.lower()
+    document_keywords = (
+        "cgpa",
+        "backlog",
+        "eligib",
+        "round",
+        "process",
+        "interview",
+    )
+    sql_keywords = (
+        "how many",
+        "count",
+        "average",
+        "avg",
+        "highest",
+        "lowest",
+        "maximum",
+        "minimum",
+        "top recruiter",
+        "total",
+        "package",
+        "salary",
+    )
+    document_match = any(word in normalized_question for word in document_keywords)
+    sql_match = any(word in normalized_question for word in sql_keywords)
+    if document_match and sql_match:
+        return "rag"
+    if document_match:
+        return "rag"
+    if sql_match:
+        return "sql"
+    return "rag"
+
+
+def load_eval_set():
+    cases = json.loads(EVAL_SET_PATH.read_text(encoding="utf-8"))
+    expected_groups = {"sql": 12, "rag": 13, "hard": 10}
+    actual_groups = {
+        group: sum(case["group"] == group for case in cases)
+        for group in expected_groups
+    }
+    if len(cases) != 35 or actual_groups != expected_groups:
+        raise ValueError(
+            f"Expected 35 cases split {expected_groups}, got {len(cases)} / {actual_groups}"
+        )
+    if len({case["id"] for case in cases}) != len(cases):
+        raise ValueError("Evaluation case IDs must be unique")
+    return cases
+
+
+def load_heldout_set():
+    cases = json.loads(HELDOUT_SET_PATH.read_text(encoding="utf-8"))
+    if len(cases) != 15:
+        raise ValueError(f"Expected 15 held-out router cases, found {len(cases)}")
+    if len({case["id"] for case in cases}) != len(cases):
+        raise ValueError("Held-out evaluation case IDs must be unique")
+    for case in cases:
+        case["held_out"] = True
+        if case["expected_intent"] not in {"sql", "rag"}:
+            raise ValueError(f"Invalid held-out expected intent: {case['id']}")
+    return cases
+
+
+def router_case_records(cases, encoder, example_vectors):
+    records = []
+    for case in cases:
+        embedding_route, scores, margin, cache_hit = classify_by_embedding(
+            case["question"],
+            encoder,
+            example_vectors,
+        )
+        records.append(
+            {
+                **case,
+                "keyword_route": keyword_intent(case["question"]) or "rag",
+                "embedding_route": embedding_route,
+                "route_scores": scores,
+                "margin": margin,
+                "embedding_cache_hit": cache_hit,
+            }
+        )
+    return records
+
+
+def summarize_router_predictions(records, predicted_routes):
+    scored = [
+        (record, predicted)
+        for record, predicted in zip(records, predicted_routes)
+        if record["expected_intent"] in {"sql", "rag"}
+    ]
+    correct = sum(predicted == record["expected_intent"] for record, predicted in scored)
+    total = len(scored)
+    return {"correct": correct, "total": total, "accuracy": correct / total if total else None}
+
+
+def run_router_analysis(model, live_fallback=False):
+    tuning_cases = load_eval_set()
+    heldout_cases = load_heldout_set()
+    all_cases = tuning_cases + heldout_cases
+    examples = load_router_examples(ROUTER_EXAMPLES_PATH)
+    example_vectors = embed_router_examples(model, examples)
+    encoder = CachedEmbeddingEncoder(model, max_size=max(512, len(all_cases)))
+    records = router_case_records(all_cases, encoder, example_vectors)
+
+    classifier_client = None
+    if live_fallback:
+        from dotenv import load_dotenv
+        from groq import Groq
+
+        load_dotenv(BASE_DIR / ".env")
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY is required for live router fallback eval")
+        classifier_client = Groq(
+            api_key=api_key,
+            timeout=5,
+            max_retries=0,
+        )
+
+    needs_fallback = [
+        record for record in records
+        if record["margin"] < max(ROUTER_MARGIN_SWEEP)
+    ]
+    fallback_labels = {}
+    fallback_errors = {}
+    if classifier_client:
+        for record in needs_fallback:
+            label, error = llm_fallback(
+                record["question"],
+                classifier_client,
+                model_name=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
+                return_error=True,
+            )
+            fallback_labels[record["id"]] = label
+            fallback_errors[record["id"]] = error
+
+    splits = {
+        "tuning": [record for record in records if not record.get("held_out")],
+        "held_out": [record for record in records if record.get("held_out")],
+    }
+    split_results = {}
+    for split_name, split_records in splits.items():
+        keyword_predictions = [record["keyword_route"] for record in split_records]
+        embedding_predictions = [record["embedding_route"] for record in split_records]
+        threshold_rows = []
+        for threshold in ROUTER_MARGIN_SWEEP:
+            fallback_count = sum(record["margin"] < threshold for record in split_records)
+            hybrid_predictions = []
+            for record in split_records:
+                if record["margin"] >= threshold:
+                    hybrid_predictions.append(record["embedding_route"])
+                elif live_fallback:
+                    hybrid_predictions.append(fallback_labels.get(record["id"], "rag"))
+                else:
+                    hybrid_predictions.append(None)
+            threshold_rows.append(
+                {
+                    "threshold": threshold,
+                    "fallback_count": fallback_count,
+                    "fallback_rate": fallback_count / len(split_records),
+                    "embedding_plus_llm_fallback": (
+                        summarize_router_predictions(split_records, hybrid_predictions)
+                        if live_fallback else None
+                    ),
+                }
+            )
+        split_results[split_name] = {
+            "keyword_only": summarize_router_predictions(split_records, keyword_predictions),
+            "embedding_only": summarize_router_predictions(split_records, embedding_predictions),
+            "threshold_sweep": threshold_rows,
+            "cases": [
+                {
+                    **record,
+                    "llm_fallback_route": fallback_labels.get(record["id"]),
+                    "llm_fallback_error": fallback_errors.get(record["id"]),
+                }
+                for record in split_records
+            ],
+        }
+
+    return {
+        "embedding_model": os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL),
+        "example_counts": {route: len(examples[route]) for route in ("sql", "rag")},
+        "fallback_evaluated_live": bool(live_fallback),
+        "thresholds": list(ROUTER_MARGIN_SWEEP),
+        "splits": split_results,
+    }
+
+
+def normalize_text(value):
+    normalized = str(value).lower().replace("’", "'")
+    normalized = re.sub(r"\bdon't\b", "do not", normalized)
+    normalized = re.sub(r"\bmust not have (?:any )?", "no ", normalized)
+    normalized = re.sub(r"\bnot have (?:any )?", "no ", normalized)
+    normalized = re.sub(r"\bno (active|historical)\b", r"not \1", normalized)
+    normalized = re.sub(
+        r"\b(?:maximum of|up to|no more than|not more than|at most)\s+",
+        "at most ",
+        normalized,
+    )
+    normalized = re.sub(
+        r"\bbefore (?:the )?student joins(?:\s+[a-z]+)?\b",
+        "before joining",
+        normalized,
+    )
+    normalized = re.sub(
+        r"one final interview focused on hr and company values",
+        "one hr values fit round",
+        normalized,
+    )
+    normalized = re.sub(r"\bor higher\b", "and above", normalized)
+    normalized = re.sub(r"\busually\b", "generally", normalized)
+    normalized = re.sub(
+        r"\bat least an? ([0-9]+(?:\.[0-9]+)?) cgpa\b",
+        r"minimum cgpa of \1",
+        normalized,
+    )
+    return " ".join(re.findall(r"[a-z0-9]+", normalized))
+
+
+def fact_is_present(fact, answer):
+    ignored_words = {"a", "an", "of", "the", "any", "is", "are", "be", "to"}
+    expected_tokens = [
+        token for token in normalize_text(fact).split() if token not in ignored_words
+    ]
+    answer_tokens = iter(normalize_text(answer).split())
+    return all(
+        any(answer_token == expected_token for answer_token in answer_tokens)
+        for expected_token in expected_tokens
+    )
+
+
+def json_value(value):
+    if isinstance(value, tuple):
+        return [json_value(item) for item in value]
+    if isinstance(value, list):
+        return [json_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: json_value(item) for key, item in value.items()}
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def values_equal(expected, actual, tolerance=0.0001):
+    if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+        return math.isclose(float(expected), float(actual), rel_tol=0, abs_tol=tolerance)
+    if isinstance(expected, list) and isinstance(actual, list):
+        if len(expected) != len(actual):
+            return False
+        unmatched = list(actual)
+        for expected_item in expected:
+            match_index = next(
+                (
+                    index
+                    for index, actual_item in enumerate(unmatched)
+                    if values_equal(expected_item, actual_item, tolerance)
+                ),
+                None,
+            )
+            if match_index is None:
+                return False
+            unmatched.pop(match_index)
+        return True
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if expected.keys() == actual.keys():
+            return all(
+                values_equal(expected[key], actual[key], tolerance) for key in expected
+            )
+        return values_equal(
+            list(expected.values()), list(actual.values()), tolerance
+        )
+    return expected == actual
+
+
+def reference_sql_results(cases):
+    frame = pd.read_csv(DATA_PATH)
+    connection = sqlite3.connect(":memory:")
+    frame.to_sql("placements", connection, index=False)
+    results = {}
+    failures = []
+    timings = []
+    try:
+        for case in cases:
+            query = case.get("reference_sql")
+            if not query:
+                continue
+            started = time.perf_counter()
+            cursor = connection.execute(query)
+            rows = cursor.fetchall()
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            timings.append(elapsed_ms)
+            columns = [column[0] for column in cursor.description]
+            if len(rows) == 1 and len(columns) == 1:
+                actual = json_value(rows[0][0])
+            else:
+                actual = [
+                    {column: json_value(value) for column, value in zip(columns, row)}
+                    for row in rows
+                ]
+            expected = case["expected_answer"].get("value")
+            if case["expected_answer"]["kind"] == "mixed_facts":
+                expected = case["expected_answer"].get("required_sql_value")
+            results[case["id"]] = actual
+            if expected is not None and not values_equal(expected, actual):
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "stage": "ground_truth_validation",
+                        "expected": expected,
+                        "actual": actual,
+                    }
+                )
+    finally:
+        connection.close()
+    return results, failures, timings, len(frame)
+
+
+def validate_document_ground_truth(cases):
+    validated = 0
+    for case in cases:
+        answer_spec = case["expected_answer"]
+        if answer_spec["kind"] not in ("rag_facts", "mixed_facts"):
+            continue
+        source_path = DOCUMENTS_DIR / answer_spec["source"]
+        if not source_path.is_file():
+            raise ValueError(f"Missing expected source file for {case['id']}: {source_path.name}")
+        source_text = normalize_text(source_path.read_text(encoding="utf-8"))
+        for fact in answer_spec.get("required_facts", []):
+            if normalize_text(fact) not in source_text:
+                raise ValueError(
+                    f"Expected fact for {case['id']} is not present in {source_path.name}: {fact}"
+                )
+        validated += 1
+    return validated
+
+
+def load_corpus(model, batch_size):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = []
+    for path in sorted(DOCUMENTS_DIR.glob("*.txt")):
+        content = path.read_text(encoding="utf-8").strip()
+        for chunk in splitter.split_text(content):
+            chunks.append({"source": path.name, "content": chunk})
+    if not chunks:
+        raise RuntimeError(f"No document chunks found under {DOCUMENTS_DIR}")
+
+    vectors = model.encode(
+        [chunk["content"] for chunk in chunks],
+        batch_size=batch_size,
+        show_progress_bar=False,
+        convert_to_numpy=True,
+    )
+    vectors = np.asarray(vectors, dtype=np.float32)
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    vectors = vectors / np.maximum(norms, 1e-12)
+    return chunks, vectors
+
+
+def retrieve(question, model, chunks, corpus_vectors):
+    embedding_started = time.perf_counter()
+    query_vector = model.encode(
+        question,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+    )
+    query_vector = np.asarray(query_vector, dtype=np.float32)
+    embedding_norm = np.linalg.norm(query_vector)
+    if embedding_norm:
+        query_vector = query_vector / embedding_norm
+    embedding_ms = (time.perf_counter() - embedding_started) * 1000
+
+    retrieval_started = time.perf_counter()
+    similarities = np.sum(corpus_vectors * query_vector, axis=1)
+    top_indices = np.argsort(-similarities)[:TOP_K]
+    matches = []
+    for index in top_indices:
+        similarity = float(np.clip(similarities[index], -1.0, 1.0))
+        match = dict(chunks[int(index)])
+        match["distance"] = 1.0 - similarity
+        matches.append(match)
+    retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
+    return matches, embedding_ms, retrieval_ms
+
+
+def post_question(api_url, question, timeout_seconds):
+    headers = {"Content-Type": "application/json"}
+    api_key = os.getenv("EVAL_API_KEY")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    request = urllib.request.Request(
+        api_url.rstrip("/") + "/ask",
+        data=json.dumps({"question": question}).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def answer_is_correct(case, response):
+    if not isinstance(response, dict):
+        return False
+    answer_spec = case["expected_answer"]
+    answer = response.get("answer")
+    kind = answer_spec["kind"]
+
+    if kind == "sql_result":
+        return values_equal(answer_spec["value"], answer)
+    if kind == "abstain":
+        return any(
+            fact_is_present(phrase, answer or "")
+            for phrase in ("not enough information", "don't have enough information")
+        )
+    if kind in ("rag_facts", "mixed_facts"):
+        normalized_answer = normalize_text(answer or "")
+        required_facts = answer_spec.get("required_facts", [])
+        facts_present = all(
+            fact_is_present(fact, normalized_answer) for fact in required_facts
+        )
+        required_source = answer_spec.get("source")
+        sources = response.get("sources") or []
+        source_present = required_source is None or required_source in sources
+        sql_value = answer_spec.get("required_sql_value")
+        sql_value_present = sql_value is None or fact_is_present(sql_value, normalized_answer)
+        return facts_present and source_present and sql_value_present
+    return False
+
+
+def percentile(values, proportion):
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = max(0, math.ceil(proportion * len(ordered)) - 1)
+    return round(ordered[index], 3)
+
+
+def latency_summary(samples):
+    return {
+        "samples": len(samples),
+        "p50_ms": percentile(samples, 0.50),
+        "p95_ms": percentile(samples, 0.95),
+    }
+
+
+def run_cache_probe(api_url, timeout_seconds):
+    probe_questions = {
+        "rag": "What CGPA is needed for Google?",
+        "sql": "How many Amazon placements are in the table?",
+    }
+    cache_probe = {}
+    for kind, probe_question in probe_questions.items():
+        try:
+            responses = []
+            client_timings = []
+            for _ in range(2):
+                started = time.perf_counter()
+                response = post_question(api_url, probe_question, timeout_seconds)
+                client_timings.append(round((time.perf_counter() - started) * 1000, 3))
+                responses.append(response)
+            cache_field = "embedding_cache_hit" if kind == "rag" else "cache_hit"
+            cache_probe[kind] = {
+                "question": probe_question,
+                "client_total_ms": client_timings,
+                "timings_ms": [response.get("timings_ms") for response in responses],
+                "cache_hits": [response.get(cache_field) for response in responses],
+                "errors": [response.get("error") for response in responses],
+            }
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+            cache_probe[kind] = {"error": str(error)}
+    return cache_probe
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--name", default="baseline", help="Output name suffix")
+    parser.add_argument(
+        "--api-url",
+        default=os.getenv("EVAL_API_URL"),
+        help="Optional running Placement Copilot base URL, e.g. http://127.0.0.1:8000",
+    )
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--http-timeout", type=float, default=60)
+    parser.add_argument(
+        "--cache-probe",
+        action="store_true",
+        help="Measure repeated identical live RAG and SQL requests after the main eval.",
+    )
+    parser.add_argument(
+        "--cache-probe-only",
+        action="store_true",
+        help="Run only the repeated-request cache probe, without the 35-case suite.",
+    )
+    parser.add_argument(
+        "--router-analysis-only",
+        action="store_true",
+        help="Compare keyword and embedding routers on tuning and held-out sets.",
+    )
+    parser.add_argument(
+        "--router-live-fallback",
+        action="store_true",
+        help="Call the real five-second Groq classifier for uncertain threshold cases.",
+    )
+    parser.add_argument(
+        "--router-threshold",
+        type=float,
+        default=float(os.getenv("ROUTER_MARGIN_THRESHOLD", "0.08")),
+    )
+    args = parser.parse_args()
+
+    if args.cache_probe_only:
+        if not args.api_url:
+            parser.error("--cache-probe-only requires --api-url")
+        report = {
+            "evaluation_name": args.name,
+            "evaluation_mode": "live_cache_probe",
+            "cache_probe": run_cache_probe(args.api_url, args.http_timeout),
+        }
+        output_dir = BASE_DIR / "results"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"eval_results_{args.name}.json"
+        output_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps(report["cache_probe"], indent=2, ensure_ascii=False))
+        print(f"Saved: {output_path.name}")
+        return
+
+    if args.router_analysis_only:
+        model_started = time.perf_counter()
+        model = SentenceTransformer(
+            os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+        )
+        model_load_ms = (time.perf_counter() - model_started) * 1000
+        analysis = run_router_analysis(model, live_fallback=args.router_live_fallback)
+        analysis["model_load_ms"] = round(model_load_ms, 3)
+        analysis["selected_threshold"] = args.router_threshold
+        report = {
+            "evaluation_name": args.name,
+            "evaluation_mode": "router_live_fallback" if args.router_live_fallback else "router_offline",
+            "tuning_case_count": len(load_eval_set()),
+            "held_out_case_count": len(load_heldout_set()),
+            "router_analysis": analysis,
+        }
+        output_dir = BASE_DIR / "results"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"eval_results_{args.name}.json"
+        output_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print("split | threshold | keyword acc | embedding acc | embed+LLM acc | fallback rate")
+        for split_name, split in analysis["splits"].items():
+            for row in split["threshold_sweep"]:
+                hybrid = row["embedding_plus_llm_fallback"]
+                print(
+                    f"{split_name} | {row['threshold']:.2f} | "
+                    f"{split['keyword_only']['accuracy']:.3f} | "
+                    f"{split['embedding_only']['accuracy']:.3f} | "
+                    f"{hybrid['accuracy'] if hybrid else 'NOT MEASURED'} | "
+                    f"{row['fallback_rate']:.3f}"
+                )
+        print(f"Saved: {output_path.relative_to(BASE_DIR)}")
+        return
+
+    cases = load_eval_set()
+    document_facts_validated = validate_document_ground_truth(cases)
+    sql_results, ground_truth_failures, sql_reference_timings, row_count = reference_sql_results(cases)
+
+    model_started = time.perf_counter()
+    model = SentenceTransformer(os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL))
+    model_load_ms = (time.perf_counter() - model_started) * 1000
+    if model.get_sentence_embedding_dimension() != 384:
+        raise RuntimeError("Evaluation model must produce 384-dimensional embeddings")
+
+    corpus_started = time.perf_counter()
+    chunks, corpus_vectors = load_corpus(model, args.batch_size)
+    corpus_embedding_ms = (time.perf_counter() - corpus_started) * 1000
+
+    results = []
+    failures = list(ground_truth_failures)
+    stage_samples = {
+        "router": [],
+        "embedding": [],
+        "vector_retrieval": [],
+        "offline_total": [],
+        "sql_reference": sql_reference_timings,
+        "live_http_total": [],
+    }
+    api_stage_samples = {
+        stage: []
+        for stage in (
+            "routing",
+            "embedding",
+            "retrieval",
+            "sql_generation",
+            "sql_execution",
+            "llm",
+            "total",
+        )
+    }
+    router_correct = 0
+    router_scored = 0
+    live_router_correct = 0
+    live_router_responses = 0
+    context_fact_correct = 0
+    context_fact_total = 0
+    retrieval_correct = 0
+    retrieval_total = 0
+    threshold_abstain_correct = 0
+    abstain_total = 0
+    live_sql_correct = 0
+    live_sql_total = 0
+    live_rag_correct = 0
+    live_rag_total = 0
+    live_abstain_correct = 0
+    live_abstain_total = 0
+    live_retrieval_correct = 0
+    live_retrieval_total = 0
+    ambiguous_routes = {}
+
+    for case in cases:
+        total_started = time.perf_counter()
+        router_started = time.perf_counter()
+        predicted_intent = keyword_classify_intent(case["question"])
+        router_ms = (time.perf_counter() - router_started) * 1000
+        stage_samples["router"].append(router_ms)
+
+        expected_intent = case["expected_intent"]
+        if expected_intent in ("sql", "rag"):
+            router_scored += 1
+            if predicted_intent == expected_intent:
+                router_correct += 1
+            else:
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "stage": "offline_keyword_router",
+                        "expected": expected_intent,
+                        "actual": predicted_intent,
+                    }
+                )
+        else:
+            ambiguous_routes[predicted_intent] = ambiguous_routes.get(predicted_intent, 0) + 1
+
+        matches, embedding_ms, retrieval_ms = retrieve(
+            case["question"], model, chunks, corpus_vectors
+        )
+        stage_samples["embedding"].append(embedding_ms)
+        stage_samples["vector_retrieval"].append(retrieval_ms)
+        offline_total_ms = (time.perf_counter() - total_started) * 1000
+        stage_samples["offline_total"].append(offline_total_ms)
+
+        sources = list(dict.fromkeys(match["source"] for match in matches))
+        context = "\n".join(match["content"] for match in matches)
+        answer_spec = case["expected_answer"]
+        kind = answer_spec["kind"]
+
+        if kind in ("rag_facts", "mixed_facts"):
+            retrieval_total += 1
+            if answer_spec["source"] in sources:
+                retrieval_correct += 1
+            else:
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "stage": "recall_at_3",
+                        "expected_source": answer_spec["source"],
+                        "retrieved_sources": sources,
+                    }
+                )
+            if kind == "rag_facts":
+                context_fact_total += 1
+                missing_facts = [
+                    fact
+                    for fact in answer_spec["required_facts"]
+                    if not fact_is_present(fact, context)
+                ]
+                if not missing_facts:
+                    context_fact_correct += 1
+                else:
+                    failures.append(
+                        {
+                            "case_id": case["id"],
+                            "stage": "retrieved_context_facts",
+                            "missing_facts": missing_facts,
+                        }
+                    )
+
+        if kind == "abstain":
+            abstain_total += 1
+            closest_distance = matches[0]["distance"] if matches else None
+            threshold_abstains = (
+                closest_distance is None or closest_distance > DISTANCE_THRESHOLD
+            )
+            if threshold_abstains:
+                threshold_abstain_correct += 1
+            else:
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "stage": "abstention_threshold_proxy",
+                        "expected": "abstain",
+                        "closest_distance": closest_distance,
+                    }
+                )
+
+        record = {
+            "id": case["id"],
+            "group": case["group"],
+            "question": case["question"],
+            "expected_intent": expected_intent,
+            "offline_intent": predicted_intent,
+            "offline_top3_sources": sources,
+            "offline_top3_distances": [round(match["distance"], 6) for match in matches],
+            "reference_sql_result": sql_results.get(case["id"]),
+            "timings_ms": {
+                "router": round(router_ms, 3),
+                "embedding": round(embedding_ms, 3),
+                "vector_retrieval": round(retrieval_ms, 3),
+                "offline_total": round(offline_total_ms, 3),
+            },
+        }
+
+        if args.api_url:
+            request_started = time.perf_counter()
+            try:
+                live_response = post_question(args.api_url, case["question"], args.http_timeout)
+                live_total_ms = (time.perf_counter() - request_started) * 1000
+                stage_samples["live_http_total"].append(live_total_ms)
+                record["live_response"] = live_response
+                record["live_total_ms"] = round(live_total_ms, 3)
+                api_timings = live_response.get("timings_ms") or {}
+                for stage, value in api_timings.items():
+                    if stage in api_stage_samples and isinstance(value, (int, float)):
+                        api_stage_samples[stage].append(float(value))
+                record["api_timings_ms"] = api_timings
+                live_intent = live_response.get("intent")
+                record["live_intent"] = live_intent
+                record["route_reason"] = live_response.get("route_reason")
+                if expected_intent in ("sql", "rag"):
+                    if live_intent is not None:
+                        live_router_responses += 1
+                    if live_intent == expected_intent:
+                        live_router_correct += 1
+                    else:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "live_router",
+                                "expected": expected_intent,
+                                "actual": live_intent,
+                                "route_reason": live_response.get("route_reason"),
+                            }
+                        )
+                if kind == "sql_result":
+                    live_sql_total += 1
+                    correct = answer_is_correct(case, live_response)
+                    live_sql_correct += int(correct)
+                    if not correct:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "sql_answer",
+                                "expected": answer_spec["value"],
+                                "actual": live_response.get("answer"),
+                            }
+                        )
+                elif kind == "rag_facts":
+                    live_rag_total += 1
+                    correct = answer_is_correct(case, live_response)
+                    live_rag_correct += int(correct)
+                    if not correct:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "rag_answer",
+                                "expected_facts": answer_spec["required_facts"],
+                                "expected_source": answer_spec["source"],
+                                "actual": live_response.get("answer"),
+                            }
+                        )
+                elif kind == "abstain":
+                    live_abstain_total += 1
+                    correct = answer_is_correct(case, live_response)
+                    live_abstain_correct += int(correct)
+                    if not correct:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "live_abstention",
+                                "expected": "abstain",
+                                "actual": live_response.get("answer"),
+                            }
+                        )
+                elif kind == "mixed_facts" and not answer_is_correct(case, live_response):
+                    failures.append(
+                        {
+                            "case_id": case["id"],
+                            "stage": "ambiguous_multi_intent",
+                            "expected": answer_spec,
+                            "actual": live_response.get("answer"),
+                        }
+                    )
+                if kind in ("rag_facts", "mixed_facts"):
+                    live_retrieval_total += 1
+                    live_sources = live_response.get("sources") or []
+                    if answer_spec["source"] not in live_sources:
+                        failures.append(
+                            {
+                                "case_id": case["id"],
+                                "stage": "live_recall_at_3",
+                                "expected_source": answer_spec["source"],
+                                "actual_sources": live_sources,
+                            }
+                        )
+                    else:
+                        live_retrieval_correct += 1
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+                record["live_error"] = str(error)
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "stage": "live_request",
+                        "error": str(error),
+                    }
+                )
+        results.append(record)
+
+    sql_reference_correct = sum(
+        1 for case in cases
+        if case.get("reference_sql") and case["id"] not in {
+            failure["case_id"] for failure in ground_truth_failures
+        }
+    )
+    sql_reference_total = sum(bool(case.get("reference_sql")) for case in cases)
+    expected_sql_cases = sum(
+        case["expected_answer"]["kind"] == "sql_result" for case in cases
+    )
+    expected_rag_cases = sum(
+        case["expected_answer"]["kind"] == "rag_facts" for case in cases
+    )
+    expected_abstain_cases = sum(
+        case["expected_answer"]["kind"] == "abstain" for case in cases
+    )
+    expected_source_cases = sum(
+        case["expected_answer"]["kind"] in ("rag_facts", "mixed_facts")
+        for case in cases
+    )
+    if args.api_url:
+        retrieval_correct = live_retrieval_correct
+        retrieval_total = expected_source_cases
+
+    router_correct_metric = live_router_correct if args.api_url else router_correct
+    metrics = {
+        "router_accuracy": {
+            "correct": router_correct_metric,
+            "total": router_scored,
+            "responses_received": live_router_responses if args.api_url else router_scored,
+            "rate": round(router_correct_metric / router_scored, 4) if router_scored else None,
+            "ambiguous_route_counts": ambiguous_routes,
+            "offline_keyword_baseline": {
+                "correct": router_correct,
+                "total": router_scored,
+                "rate": round(router_correct / router_scored, 4) if router_scored else None,
+            },
+            "note": "Ambiguous expected_intent cases are excluded; live mode scores API route decisions.",
+        },
+        "sql_accuracy": {
+            "correct": live_sql_correct if args.api_url else None,
+            "total": expected_sql_cases,
+            "responses_received": live_sql_total,
+            "rate": round(live_sql_correct / expected_sql_cases, 4)
+            if args.api_url and expected_sql_cases else None,
+            "reference_data_validation": {
+                "correct": sql_reference_correct,
+                "total": sql_reference_total,
+                "rate": round(sql_reference_correct / sql_reference_total, 4)
+                if sql_reference_total else None,
+            },
+            "note": "Live SQL answer accuracy requires --api-url; reference validation checks fixture SQL against the CSV, not generated SQL.",
+        },
+        "rag_accuracy": {
+            "correct": live_rag_correct if args.api_url else None,
+            "total": expected_rag_cases,
+            "responses_received": live_rag_total,
+            "rate": round(live_rag_correct / expected_rag_cases, 4)
+            if args.api_url and expected_rag_cases else None,
+            "offline_retrieved_context_fact_accuracy": {
+                "correct": context_fact_correct,
+                "total": context_fact_total,
+                "rate": round(context_fact_correct / context_fact_total, 4)
+                if context_fact_total else None,
+            },
+            "note": "Live answer accuracy requires --api-url; offline context-fact coverage is a retrieval proxy, not generated-answer accuracy.",
+        },
+        "recall_at_3": {
+            "correct_sources": retrieval_correct,
+            "total_source_cases": retrieval_total,
+            "responses_received": live_retrieval_total if args.api_url else retrieval_total,
+            "rate": round(retrieval_correct / retrieval_total, 4) if retrieval_total else None,
+            "mode": "live_api_sources" if args.api_url else "local_exact_cosine_over_chunked_documents",
+        },
+        "abstention_correctness": {
+            "live_correct": live_abstain_correct if args.api_url else None,
+            "live_total": expected_abstain_cases,
+            "live_responses_received": live_abstain_total,
+            "live_rate": round(live_abstain_correct / expected_abstain_cases, 4)
+            if args.api_url and expected_abstain_cases else None,
+            "offline_threshold_proxy_correct": threshold_abstain_correct,
+            "offline_threshold_proxy_total": abstain_total,
+            "offline_threshold_proxy_rate": round(threshold_abstain_correct / abstain_total, 4)
+            if abstain_total else None,
+        },
+    }
+
+    latency = {
+        "model_load": {"samples": 1, "p50_ms": round(model_load_ms, 3), "p95_ms": round(model_load_ms, 3)},
+        "corpus_embedding_and_prepare": {"samples": 1, "p50_ms": round(corpus_embedding_ms, 3), "p95_ms": round(corpus_embedding_ms, 3)},
+        "router": latency_summary(stage_samples["router"]),
+        "embedding": latency_summary(stage_samples["embedding"]),
+        "vector_retrieval": latency_summary(stage_samples["vector_retrieval"]),
+        "offline_total_per_case": latency_summary(stage_samples["offline_total"]),
+        "sql_reference_execution": latency_summary(stage_samples["sql_reference"]),
+        "live_http_total": latency_summary(stage_samples["live_http_total"]),
+        "api_routing": latency_summary(api_stage_samples["routing"]),
+        "api_embedding": latency_summary(api_stage_samples["embedding"]),
+        "api_retrieval": latency_summary(api_stage_samples["retrieval"]),
+        "api_sql_generation": latency_summary(api_stage_samples["sql_generation"]),
+        "api_sql_execution": latency_summary(api_stage_samples["sql_execution"]),
+        "api_llm": latency_summary(api_stage_samples["llm"]),
+        "api_total": latency_summary(api_stage_samples["total"]),
+        "note": "API stage timings exclude HTTP serialization; live_http_total includes full client-observed duration.",
+    }
+
+    report = {
+        "evaluation_name": args.name,
+        "evaluation_mode": "live_api" if args.api_url else "offline",
+        "dataset_path": "eval_set.json",
+        "case_count": len(cases),
+        "source_document_count": len(list(DOCUMENTS_DIR.glob("*.txt"))),
+        "document_ground_truth_facts_validated": document_facts_validated,
+        "chunk_count": len(chunks),
+        "csv_row_count": row_count,
+        "embedding_model": os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL),
+        "embedding_dimension": int(model.get_sentence_embedding_dimension()),
+        "retrieval_top_k": TOP_K,
+        "abstention_distance_threshold": DISTANCE_THRESHOLD,
+        "measurements": {
+            "router": "ask_api.classify_intent",
+            "retrieval": "local exact cosine similarity over the same splitter settings; does not execute PostgreSQL/pgvector",
+            "sql_reference": "SQLite execution over synthetic_placements.csv; validates stored expected values only",
+            "answer_accuracy": "live HTTP endpoint only",
+        },
+        "metrics": metrics,
+        "latency_ms": latency,
+        "failures": failures,
+        "cases": results,
+    }
+    if args.cache_probe and args.api_url:
+        report["cache_probe"] = run_cache_probe(args.api_url, args.http_timeout)
+
+    output_dir = BASE_DIR / "results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"eval_results_{args.name}.json"
+    output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    print(f"Evaluation: {args.name} ({report['evaluation_mode']})")
+    print(f"Cases: {len(cases)}; documents: {report['source_document_count']}; chunks: {len(chunks)}; CSV rows: {row_count}")
+    print("Router accuracy: {correct}/{total} ({rate})".format(**metrics["router_accuracy"]))
+    print("SQL generated-answer accuracy: {}/{} ({})".format(
+        metrics["sql_accuracy"]["correct"], metrics["sql_accuracy"]["total"], metrics["sql_accuracy"]["rate"]
+    ))
+    print("SQL reference answers validated: {correct}/{total} ({rate})".format(**metrics["sql_accuracy"]["reference_data_validation"]))
+    print("RAG generated-answer accuracy: {}/{} ({})".format(
+        metrics["rag_accuracy"]["correct"], metrics["rag_accuracy"]["total"], metrics["rag_accuracy"]["rate"]
+    ))
+    print("Offline context-fact accuracy: {correct}/{total} ({rate})".format(**metrics["rag_accuracy"]["offline_retrieved_context_fact_accuracy"]))
+    print("Recall@3: {correct_sources}/{total_source_cases} ({rate})".format(**metrics["recall_at_3"]))
+    print("Abstention threshold proxy: {}/{} ({})".format(
+        metrics["abstention_correctness"]["offline_threshold_proxy_correct"],
+        metrics["abstention_correctness"]["offline_threshold_proxy_total"],
+        metrics["abstention_correctness"]["offline_threshold_proxy_rate"],
+    ))
+    print("Latency p50/p95 ms:")
+    for stage in ("router", "embedding", "vector_retrieval", "offline_total_per_case", "sql_reference_execution", "live_http_total"):
+        print(f"  {stage}: {latency[stage]['p50_ms']}/{latency[stage]['p95_ms']}")
+    print(f"Failure rows: {len(failures)}")
+    if report.get("cache_probe"):
+        print("Cache probe:")
+        for kind, probe in report["cache_probe"].items():
+            timings = probe.get("timings_ms") or []
+            print(
+                f"  {kind}: cache_hit {probe.get('cache_hits')}; endpoint_total_ms "
+                f"{[timing.get('total') if timing else None for timing in timings]}; "
+                f"client_total_ms {probe.get('client_total_ms')}"
+            )
+    if failures:
+        print("case_id | stage | detail")
+        for failure in failures:
+            detail = failure.get("error") or failure.get("missing_facts") or failure.get("expected_source") or failure.get("actual")
+            print(f"{failure.get('case_id')} | {failure.get('stage')} | {detail}")
+    print(f"Saved: {output_path.name}")
+
+
+if __name__ == "__main__":
+    main()

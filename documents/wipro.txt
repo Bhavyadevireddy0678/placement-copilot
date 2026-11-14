@@ -1,0 +1,14 @@
+Wipro Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 6.0 to apply for Wipro.
+
+Students are allowed a maximum of one active backlog at the time of the Wipro assessment, but it must be cleared before onboarding.
+
+Recruitment process (Wipro Elite NTH) consists of an online aptitude and coding assessment followed by a technical-cum-HR interview.
+
+Wipro primarily hires for Project Engineer roles across all engineering branches, with a separate Wipro Turbo track for candidates with prior internship or certification experience.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria may vary depending on whether the candidate applies via the standard Elite track or the Turbo track.

@@ -1,0 +1,14 @@
+Google Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 8.0 to apply for Google.
+
+Students must not have any active or historical backlogs at the time of application.
+
+Recruitment process consists of an online coding assessment, followed by two to three technical interview rounds focused on data structures, algorithms, and system design, and a final HR/googleyness round.
+
+Google primarily recruits for Software Engineer and STEP Intern roles, restricted to CSE, CSE-AI, and IT branches.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+Given the highly limited number of openings, actual selection bar is typically well above the stated minimum CGPA.

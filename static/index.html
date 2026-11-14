@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Placement Copilot</title>
+    <meta name="description" content="Placement Copilot — a calm, editorial interface for campus placement intelligence." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="masthead" role="banner">
+        <div class="header-inner">
+          <div class="brand-block">
+            <div class="brand-mark" aria-hidden="true">P</div>
+            <div class="brand-copy">
+              <span class="eyebrow">PLACEMENT COPILOT</span>
+              <div class="brand-name">Placement Copilot</div>
+            </div>
+          </div>
+
+          <nav class="top-nav" aria-label="Main navigation">
+            <a href="#">Work</a>
+            <a href="#">Reports</a>
+            <a href="#">Profiles</a>
+            <a href="#">Archive</a>
+          </nav>
+
+          <div class="header-actions">
+            <a class="ask-top" href="#question">Ask Copilot</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="composition" role="main">
+        <!-- HERO / COVER: asymmetric editorial composition -->
+        <section class="hero-cover">
+          <div class="hero-left">
+            <div class="issue-small">CURRENT ISSUE / 2026</div>
+            <h1 class="hero-head" id="hero-title">
+              Placement intelligence,
+              <br>
+              framed with clarity.
+            </h1>
+            <p class="hero-lede">A research-driven interface for understanding campus placements, companies, interview experiences and outcomes.</p>
+            <div class="hero-cta">
+              <a class="cta-primary" href="#findings">Explore placement data →</a>
+            </div>
+          </div>
+
+          <div class="hero-right">
+            <div class="issue-big">04</div>
+            <div class="issue-meta-block">
+              <div class="meta-line">2026</div>
+              <div class="meta-line">PLACEMENT DATA</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- thin rule separates hero from research desk -->
+        <hr class="thin-rule">
+
+        <!-- RESEARCH DESK: integrated search instrument -->
+        <section class="research-desk" aria-labelledby="query-heading">
+          <div class="desk-head">
+            <span class="desk-label">RESEARCH DESK</span>
+            <p class="desk-sub">What would you like to know?</p>
+          </div>
+
+          <div class="desk-input">
+            <label class="sr-only" for="question">Research query</label>
+            <div class="input-shell">
+              <input id="question" type="text" placeholder="Which companies offered the highest packages?" />
+              <button id="askBtn" type="button" aria-label="Ask">→</button>
+            </div>
+            <label class="api-key-label" for="apiKey">API KEY</label>
+            <input id="apiKey" class="api-key-input" type="password" autocomplete="off" />
+          </div>
+        </section>
+
+        <!-- FINDINGS -->
+        <section class="findings" id="findings">
+          <div class="findings-head">
+            <div class="finding-index">RECENT FINDING</div>
+            <div class="finding-id">01</div>
+            <div class="intent-badge" id="intentBadge">AWAITING</div>
+          </div>
+
+          <article class="finding-article" id="answerBlock">
+            <div class="finding-label">SQL · PLACEMENT DATABASE</div>
+
+            <div class="finding-main">
+              <div class="primary-stat hidden" id="statBlock">
+                <div class="primary-number" id="statValue">0</div>
+                <div class="primary-caption">students placed</div>
+              </div>
+
+              <div class="primary-text" id="textBody">
+                <h3 id="findingTitle">Research output</h3>
+                <p id="answerText">Your answer will appear here.</p>
+              </div>
+            </div>
+
+            <div class="finding-meta">
+              <div class="meta"><small>METHOD</small><div id="methodText">—</div></div>
+              <div class="meta"><small>SOURCE</small><div id="sourceText">—</div></div>
+            </div>
+
+            <div class="sql-toggle">
+              <button id="viewSqlBtn">VIEW GENERATED SQL →</button>
+            </div>
+
+            <div id="sqlBox" class="sql-panel hidden" aria-hidden="true">
+              <pre id="generatedSql"></pre>
+            </div>
+          </article>
+        </section>
+
+        <!-- INTERVIEW ARCHIVE -->
+        <section class="archive" id="archive">
+          <div class="section-head">
+            <div class="section-label">INTERVIEW ARCHIVE</div>
+            <h2 class="section-title">What students experienced</h2>
+          </div>
+
+          <div class="archive-list">
+            <article class="archive-item">
+              <div class="archive-meta">
+                <div class="company">Amazon</div>
+                <div class="role">SDE Intern — 2024</div>
+              </div>
+              <p class="archive-excerpt">Round 1: coding problems focused on arrays and graphs. Warm advice: clarify edge-cases and ask about constraints.</p>
+            </article>
+
+            <article class="archive-item">
+              <div class="archive-meta">
+                <div class="company">Deloitte</div>
+                <div class="role">Consultant — 2023</div>
+              </div>
+              <p class="archive-excerpt">Behavioral + case round. Emphasize structure, speak clearly, and narrate your framework.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- COMPANY PROFILES -->
+        <section class="companies" id="companies">
+          <div class="section-head">
+            <div class="section-label">COMPANY PROFILES</div>
+            <h2 class="section-title">Browse companies</h2>
+            <p class="sample-data-note" id="companyDataNote">Sample placement data</p>
+          </div>
+
+          <div class="company-grid" id="companyGrid" aria-live="polite">
+            <p>Loading company summaries…</p>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

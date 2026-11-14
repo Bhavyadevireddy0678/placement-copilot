@@ -1,0 +1,76 @@
+{
+  "evaluation_name": "cache_probe",
+  "evaluation_mode": "live_cache_probe",
+  "cache_probe": {
+    "rag": {
+      "question": "What CGPA is needed for Google?",
+      "client_total_ms": [
+        778.863,
+        634.072
+      ],
+      "timings_ms": [
+        {
+          "routing": 0.007,
+          "embedding": 193.623,
+          "retrieval": 63.205,
+          "sql_generation": null,
+          "sql_execution": null,
+          "llm": 511.019,
+          "total": 767.937
+        },
+        {
+          "routing": 0.006,
+          "embedding": 0.003,
+          "retrieval": 5.681,
+          "sql_generation": null,
+          "sql_execution": null,
+          "llm": 625.148,
+          "total": 630.902
+        }
+      ],
+      "cache_hits": [
+        false,
+        true
+      ],
+      "errors": [
+        null,
+        null
+      ]
+    },
+    "sql": {
+      "question": "How many Amazon placements are in the table?",
+      "client_total_ms": [
+        447.024,
+        621.33
+      ],
+      "timings_ms": [
+        {
+          "routing": 0.012,
+          "embedding": null,
+          "retrieval": null,
+          "sql_generation": 429.698,
+          "sql_execution": 14.494,
+          "llm": null,
+          "total": 444.243
+        },
+        {
+          "routing": 0.005,
+          "embedding": null,
+          "retrieval": null,
+          "sql_generation": 619.523,
+          "sql_execution": 0.005,
+          "llm": null,
+          "total": 619.552
+        }
+      ],
+      "cache_hits": [
+        false,
+        true
+      ],
+      "errors": [
+        null,
+        null
+      ]
+    }
+  }
+}

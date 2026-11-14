@@ -1,0 +1,14 @@
+LSEG (London Stock Exchange Group) Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 7.5 to apply for LSEG.
+
+Students must not have any active or historical backlogs at the time of application.
+
+Recruitment process consists of an online technical assessment (DSA and CS fundamentals), followed by two technical interview rounds and one HR round.
+
+LSEG primarily recruits for Software Engineer roles under CSE, CSE-AI, and IT branches, with a strong emphasis on data structures, algorithms, and problem solving.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria are stricter than most core-branch recruiters given LSEG's product-engineering focus.

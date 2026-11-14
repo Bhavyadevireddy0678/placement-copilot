@@ -1,0 +1,14 @@
+Accenture Placement Eligibility
+# Last verified: manually compiled, Sep 2026
+
+Students must have a minimum CGPA of 6.5 to apply for Accenture.
+
+Students must not have any active backlogs at the time of the recruitment process.
+
+Recruitment process includes an online cognitive and technical assessment, a communication assessment, and a technical/HR interview.
+
+Accenture primarily hires for Associate Software Engineer and Application Development Associate roles across CSE, CSE-AI, IT, and ECE branches.
+
+Students must satisfy all placement cell eligibility requirements before applying.
+
+The required CGPA and backlog criteria may vary depending on the specific Accenture package band (standard vs advanced).
